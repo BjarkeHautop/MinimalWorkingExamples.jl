@@ -27,7 +27,6 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
   overrides the auto-detected version from `using`/`import`.
 - `manifest_path=nothing`: path to an existing `Manifest.toml` to use as-is. When set,
   `Pkg.add` is skipped entirely and `Pkg.instantiate()` reproduces the exact environment.
-  A `Project.toml` in the same directory is copied alongside it if present.
   Mutually exclusive with `packagespecs`.
 
 # Examples
@@ -312,8 +311,6 @@ function _setup_temp_env!(
 )
     if !isnothing(manifest_path)
         cp(manifest_path, joinpath(tmpdir, "Manifest.toml"))
-        project_toml = joinpath(dirname(abspath(manifest_path)), "Project.toml")
-        isfile(project_toml) && cp(project_toml, joinpath(tmpdir, "Project.toml"))
         setup_script = "using Pkg\nPkg.instantiate()\n"
     else
         packages = _extract_packages(code_str)
