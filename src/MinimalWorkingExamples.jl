@@ -32,6 +32,7 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
   Mutually exclusive with `packagespecs`.
 - `verbose=false`: if `true`, show Pkg output (downloads, resolver messages) during environment
   setup.
+- `stacktrace=false`: if `true`, append the full stacktrace after the error message.
 
 # Examples
 
@@ -97,6 +98,7 @@ macro mwe(ex, kwargs...)
             packagespecs = $(get(kw, :packagespecs, :(Pkg.PackageSpec[]))),
             manifest_path = $(get(kw, :manifest_path, nothing)),
             verbose = $(get(kw, :verbose, false)),
+            stacktrace = $(get(kw, :stacktrace, false)),
         )
     end
 end
@@ -134,6 +136,7 @@ function mwe(
     packagespecs::Vector = Pkg.PackageSpec[],
     manifest_path::Union{AbstractString,Nothing} = nothing,
     verbose::Bool = false,
+    stacktrace::Bool = false,
 )
     _run_mwe(
         code;
@@ -145,6 +148,7 @@ function mwe(
         packagespecs,
         manifest_path,
         verbose,
+        stacktrace,
     )
 end
 
@@ -293,7 +297,7 @@ end
 
 # ── Driver script ──────────────────────────────────────────────────────────────
 
-function _build_driver_script(code_str::AbstractString)
+function _build_driver_script(code_str::AbstractString; stacktrace::Bool = false)
     return """
     using Logging
 
@@ -324,12 +328,14 @@ function _build_driver_script(code_str::AbstractString)
         _mwe_rd_err, _mwe_wr_err = redirect_stderr()
         local _mwe_val = nothing
         local _mwe_err = nothing
+        local _mwe_bt = nothing
         try
             _mwe_val = with_logger(ConsoleLogger(_mwe_wr_err, Logging.Info)) do
                 Base.invokelatest(Core.eval, Main, _mwe_node)
             end
         catch _e
             _mwe_err = _e
+            _mwe_bt = catch_backtrace()
         finally
             redirect_stdout(_mwe_original_out)
             redirect_stderr(_mwe_original_err)
@@ -344,7 +350,19 @@ function _build_driver_script(code_str::AbstractString)
         _mwe_prefix_output(_mwe_captured_out)
         _mwe_prefix_output(_mwe_captured_err)
         if !isnothing(_mwe_err)
-            _mwe_prefix_output("ERROR: " * sprint(showerror, _mwe_err))
+            if $(stacktrace)
+                _mwe_frames = Base.stacktrace(_mwe_bt)
+                _mwe_cutoff = findfirst(
+                    f -> f.func === :eval && endswith(String(f.file), "boot.jl"),
+                    _mwe_frames,
+                )
+                _mwe_frames = isnothing(_mwe_cutoff) ? _mwe_frames : _mwe_frames[1:_mwe_cutoff-1]
+                _mwe_st = isempty(_mwe_frames) ? "" : "\\n" * sprint(Base.show_backtrace, _mwe_frames)
+                _mwe_err_str = sprint(showerror, _mwe_err) * _mwe_st
+            else
+                _mwe_err_str = sprint(showerror, _mwe_err)
+            end
+            _mwe_prefix_output("ERROR: " * _mwe_err_str)
             break
         end
         if i == length(_mwe_nodes) && _mwe_val !== nothing
@@ -399,12 +417,13 @@ function _run_in_new_process(
     packagespecs::Vector = Pkg.PackageSpec[],
     manifest_path::Union{AbstractString,Nothing} = nothing,
     verbose::Bool = false,
+    stacktrace::Bool = false,
 )
     mktempdir() do tmpdir
         temp && _setup_temp_env!(tmpdir, code_str, packagespecs, manifest_path; verbose)
 
         script_path = joinpath(tmpdir, "mwe_driver.jl")
-        write(script_path, _build_driver_script(code_str))
+        write(script_path, _build_driver_script(code_str; stacktrace))
 
         julia_exe = joinpath(Sys.BINDIR, Base.julia_exename())
         project_flag = temp ? "--project=$tmpdir" : "--project=@."
@@ -433,12 +452,14 @@ function _capture_eval(ex::Expr)
     rd_err, wr_err = redirect_stderr()
     local val = nothing
     local err = nothing
+    local bt = nothing
     try
         val = Logging.with_logger(Logging.ConsoleLogger(wr_err, Logging.Info)) do
             Base.invokelatest(Core.eval, Main, ex)
         end
     catch e
         err = e
+        bt = catch_backtrace()
     finally
         redirect_stdout(original_out)
         redirect_stderr(original_err)
@@ -449,7 +470,7 @@ function _capture_eval(ex::Expr)
     captured_err = read(rd_err, String)
     close(rd_out)
     close(rd_err)
-    return val, captured_out, captured_err, err
+    return val, captured_out, captured_err, err, bt
 end
 
 function _prefix_lines(io::IO, str::AbstractString, prefix::AbstractString)
@@ -459,7 +480,22 @@ function _prefix_lines(io::IO, str::AbstractString, prefix::AbstractString)
     end
 end
 
-function _run_in_current_process(code_str::AbstractString)
+# Keep only frames above the Core.eval boundary — everything below is driver
+# or REPL infrastructure irrelevant to the user's code.
+function _user_frames(bt)
+    frames = Base.stacktrace(bt)
+    cutoff = findfirst(f -> f.func === :eval && endswith(String(f.file), "boot.jl"), frames)
+    return isnothing(cutoff) ? frames : frames[1:(cutoff-1)]
+end
+
+function _format_error(err, bt; stacktrace::Bool = false)
+    stacktrace || return sprint(showerror, err)
+    frames = _user_frames(bt)
+    st = isempty(frames) ? "" : "\n" * sprint(Base.show_backtrace, frames)
+    return sprint(showerror, err) * st
+end
+
+function _run_in_current_process(code_str::AbstractString; stacktrace::Bool = false)
     buf = IOBuffer()
     nodes =
         [n for n in Meta.parseall(code_str).args if !(n isa LineNumberNode) && n isa Expr]
@@ -469,12 +505,12 @@ function _run_in_current_process(code_str::AbstractString)
             break
         end
         ex_str = _expr_to_display_string(node)
-        val, captured_out, captured_err, err = _capture_eval(node)
+        val, captured_out, captured_err, err, bt = _capture_eval(node)
         println(buf, ex_str)
         _prefix_lines(buf, captured_out, "#> ")
         _prefix_lines(buf, captured_err, "#> ")
         if !isnothing(err)
-            _prefix_lines(buf, "ERROR: " * sprint(showerror, err), "#> ")
+            _prefix_lines(buf, "ERROR: " * _format_error(err, bt; stacktrace), "#> ")
             break
         end
         if i == length(nodes) && val !== nothing
@@ -502,14 +538,23 @@ function _run_mwe(
     packagespecs::Vector = Pkg.PackageSpec[],
     manifest_path::Union{AbstractString,Nothing} = nothing,
     verbose::Bool = false,
+    stacktrace::Bool = false,
 )
     venue in (:gh, :slack) || error("venue must be :gh or :slack, got $(repr(venue))")
     _advertise = isnothing(advertise) ? (venue === :gh) : advertise
 
     repl_output, manifest_str = if newprocess
-        _run_in_new_process(code_str; temp, manifest, packagespecs, manifest_path, verbose)
+        _run_in_new_process(
+            code_str;
+            temp,
+            manifest,
+            packagespecs,
+            manifest_path,
+            verbose,
+            stacktrace,
+        )
     else
-        _run_in_current_process(code_str)
+        _run_in_current_process(code_str; stacktrace)
     end
 
     lang = venue === :gh ? "julia" : ""

@@ -6,6 +6,8 @@ CurrentModule = MinimalWorkingExamples
 
 Turn a snippet of Julia code into a shareable, self-contained Markdown block for pasting into a GitHub issue, Discourse post, or Slack message.
 
+Inspired by the R package [reprex](https://reprex.tidyverse.org/).
+
 ## Installation
 
 Not yet registered. Install directly from GitHub:
@@ -100,8 +102,34 @@ x = [1, 2, 3]
 x[10]
 #> ERROR: BoundsError: attempt to access 3-element Vector{Int64} at index [10]
 ```
+````
 
-<sup>Created on <date> with [MinimalWorkingExamples v<pkg-version>](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia <version></sup>
+Stacktrace can be included by passing `stacktrace=true`:
+
+```julia
+@mwe begin
+    x = [1, 2, 3]
+    x[10]
+    x[1]  # never reached
+end stacktrace=true
+```
+
+Output:
+
+````markdown
+```julia
+x = [1, 2, 3]
+x[10]
+#> ERROR: BoundsError: attempt to access 3-element Vector{Int64} at index [10]
+#>
+#> Stacktrace:
+#>  [1] throw_boundserror(A::Vector{Int64}, I::Tuple{Int64})
+#>    @ Base ./essentials.jl:15
+#>  [2] getindex(A::Vector{Int64}, i::Int64)
+#>    @ Base ./essentials.jl:919
+#>  [3] top-level scope
+#>    @ none:1
+```
 ````
 
 ## Including environment details
