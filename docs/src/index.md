@@ -51,7 +51,7 @@ end manifest=true
 
 ## Pinning a specific package version
 
-Use `packagespecs` to pin one or more packages to a particular version, git revision, or URL. This is useful for creating MWEs against an unreleased fix or a PR branch:
+Use `packagespecs` to pin one or more packages to a particular version, git revision, or URL.
 
 ```julia
 using Pkg
