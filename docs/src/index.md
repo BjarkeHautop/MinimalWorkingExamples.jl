@@ -8,7 +8,7 @@ Turn a snippet of Julia code into a shareable, self-contained Markdown block —
 
 ## Basic usage
 
-Write your code in a `begin...end` block and pass it to [`@mwe`](@ref):
+Write your code in a `begin...end` block and pass it to `@mwe`:
 
 ```julia
 using MinimalWorkingExamples
@@ -35,7 +35,7 @@ mean(x)
 
 The value of the last expression is shown as `#>`, as are any `print`/`println` calls anywhere in the code.
 
-[`mwe()`][@ref] is the function version of the macro. If the first argument is not given code from the clipboard is passed.
+`mwe()` is the function version of the macro. If the first argument is not given, code is read from the clipboard.
 
 ## Including environment details
 

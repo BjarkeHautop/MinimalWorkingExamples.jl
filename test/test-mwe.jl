@@ -193,6 +193,7 @@ end
         packagespecs = [],
     )
     @test contains(result.md, "MinimalWorkingExamples.jl")
+    @test contains(result.md, "v" * string(pkgversion(MinimalWorkingExamples)))
     @test contains(result.md, string(VERSION))
     @test contains(result.md, "<sup>")
 end
