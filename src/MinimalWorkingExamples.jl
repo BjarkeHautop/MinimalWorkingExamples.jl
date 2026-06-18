@@ -10,7 +10,8 @@ export @mwe, mwe, MWEResult
 """
     @mwe begin
         code
-    end [venue=:gh] [temp=true] [newprocess=true] [manifest=false] [advertise=nothing] [packagespecs=PackageSpec[]] [manifest_path=nothing] [verbose=false]
+    end [venue=:gh] [temp=true] [newprocess=true] [manifest=false] [advertise=nothing]
+        [packagespecs=PackageSpec[]] [manifest_path=nothing] [verbose=false] [stacktrace=false]
 
 Generate a Minimal Working Example (MWE) formatted as Markdown, then copy it to the clipboard.
 
@@ -35,8 +36,6 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
 - `stacktrace=false`: if `true`, append the full stacktrace after the error message.
 
 # Examples
-
-Basic usage:
 
 ```julia
 @mwe begin
@@ -67,14 +66,13 @@ using Pkg
 end packagespecs=[PackageSpec(name="Example", version="0.5.3")]
 ```
 
-Use a PR branch directly from GitHub:
+Include the stacktrace when an error is thrown:
 
 ```julia
-using Pkg
 @mwe begin
-    using MyPackage
-    MyPackage.new_feature()
-end packagespecs=[PackageSpec(url="https://github.com/user/MyPackage.jl", rev="my-fix-branch")]
+    x = [1, 2, 3]
+    x[10]
+end stacktrace=true
 ```
 """
 macro mwe(ex, kwargs...)
@@ -105,7 +103,7 @@ end
 
 """
     mwe([code]; venue=:gh, temp=true, newprocess=true, manifest=false, advertise=nothing,
-               packagespecs=PackageSpec[], manifest_path=nothing)
+               packagespecs=PackageSpec[], manifest_path=nothing, verbose=false, stacktrace=false)
 
 Function form of [`@mwe`](@ref). Accepts code as a plain string.
 If `code` is omitted, reads Julia source from the clipboard.
@@ -117,7 +115,7 @@ If `code` is omitted, reads Julia source from the clipboard.
 mwe()
 
 # Format for Slack:
-mwe(venue=:slack)
+mwe(; venue=:slack)
 
 # Run an explicit string:
 mwe(\"""
