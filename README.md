@@ -44,8 +44,6 @@ x = [1, 2, 3, 4, 5]
 mean(x)
 #> 3.0
 ```
-
-<sup>Created on <date> with [MinimalWorkingExamples v<pkg-version>](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia <version></sup>
 ````
 
 The value of the last expression is shown as `#>`, as are any `print` calls and log messages (`@warn`, `@info`) in the code.
