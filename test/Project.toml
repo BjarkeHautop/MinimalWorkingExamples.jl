@@ -1,6 +1,5 @@
 [deps]
 MinimalWorkingExamples = "1cd72250-7741-5363-ad87-1e7986b7dfb4"
-Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
 TestItemRunner = "f8b46487-2199-4994-9208-9a1283c18c0a"
