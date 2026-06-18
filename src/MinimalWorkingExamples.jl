@@ -171,8 +171,11 @@ Base.String(r::MWEResult) = r.md
 # Base.remove_linenums! strips LineNumberNodes from :block/:quote but leaves
 # them in macrocall arg lists.
 # string() then prints them as ` #= file:line =#` annotations. Strip those.
-function _expr_to_display_string(ex::Expr)
-    s = string(Base.remove_linenums!(deepcopy(ex)))
+# Top-level nodes can also be bare literals or symbols (e.g. a final `42`),
+# which are not `Expr`; render those directly.
+function _expr_to_display_string(node)
+    node isa Expr || return string(node)
+    s = string(Base.remove_linenums!(deepcopy(node)))
     return replace(s, r"#= [^\n=]*:\d+ =# ?" => "")
 end
 
@@ -201,10 +204,13 @@ function _extract_packages(code_str::AbstractString)
         node.head in (:using, :import) || continue
         for item in node.args
             item isa Expr || continue
-            top = if item.head == :.
-                string(first(item.args))
-            elseif item.head == :(:)
-                src = item.args[1]
+            # `import Foo as Bar` wraps the module path in an `:as` node.
+            inner = item.head == :as ? item.args[1] : item
+            inner isa Expr || continue
+            top = if inner.head == :.
+                string(first(inner.args))
+            elseif inner.head == :(:)
+                src = inner.args[1]
                 src isa Expr && src.head == :. ? string(first(src.args)) : nothing
             else
                 nothing
@@ -306,7 +312,8 @@ function _build_driver_script(code_str::AbstractString; stacktrace::Bool = false
         end
     end
 
-    function _mwe_to_display_string(ex::Expr)
+    function _mwe_to_display_string(ex)
+        ex isa Expr || return string(ex)
         s = string(Base.remove_linenums!(deepcopy(ex)))
         return replace(s, r"#= [^\\n=]*:\\d+ =# ?" => "")
     end
@@ -447,7 +454,7 @@ function _run_in_new_process(
     end
 end
 
-function _capture_eval(ex::Expr)
+function _capture_eval(ex)
     original_out = Base.stdout
     original_err = Base.stderr
     rd_out, wr_out = redirect_stdout()
@@ -499,10 +506,9 @@ end
 
 function _run_in_current_process(code_str::AbstractString; stacktrace::Bool = false)
     buf = IOBuffer()
-    nodes =
-        [n for n in Meta.parseall(code_str).args if !(n isa LineNumberNode) && n isa Expr]
+    nodes = [n for n in Meta.parseall(code_str).args if !(n isa LineNumberNode)]
     for (i, node) in enumerate(nodes)
-        if node.head === :error
+        if node isa Expr && node.head === :error
             _prefix_lines(buf, "ERROR: " * sprint(showerror, node.args[1]), "#> ")
             break
         end
@@ -543,6 +549,9 @@ function _run_mwe(
     stacktrace::Bool = false,
 )
     venue in (:gh, :slack) || error("venue must be :gh or :slack, got $(repr(venue))")
+    if !isnothing(manifest_path) && !isempty(packagespecs)
+        error("`manifest_path` and `packagespecs` are mutually exclusive; pass only one")
+    end
     _advertise = isnothing(advertise) ? (venue === :gh) : advertise
 
     repl_output, manifest_str = if newprocess

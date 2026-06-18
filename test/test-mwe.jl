@@ -8,6 +8,8 @@
     @test _extract_packages("using Foo: bar, baz") == ["Foo"]
     @test _extract_packages("import Foo") == ["Foo"]
     @test _extract_packages("import Foo.Bar") == ["Foo"]
+    @test _extract_packages("import Foo as Bar") == ["Foo"]
+    @test _extract_packages("import Foo: bar as b") == ["Foo"]
     @test isempty(_extract_packages("using LinearAlgebra\nusing Statistics"))
     @test _extract_packages("using LinearAlgebra\nusing SomeFakePackage123") ==
           ["SomeFakePackage123"]
@@ -43,6 +45,16 @@ end
     @test !contains(result.md, "#> 42")  # not the last expression
     @test contains(result.md, "x * 2")
     @test contains(result.md, "#> 84")   # last expression
+end
+
+@testitem "final bare literal shown as #> (in-process)" tags=[:unit, :fast] begin
+    result = @mwe begin
+        x = 5
+        42
+    end temp=false newprocess=false manifest=false advertise=false
+    @test result isa MWEResult
+    @test contains(result.md, "#> 42")   # the literal is the displayed value
+    @test !contains(result.md, "#> 5")   # not the assignment's value
 end
 
 @testitem "stdout prefixed with #> for all expressions" tags=[:unit, :fast] begin
@@ -334,6 +346,15 @@ end
 
 # ── mwe() function form ───────────────────────────────────────────────────────
 
+@testitem "manifest_path and packagespecs are mutually exclusive" tags=[:unit, :fast] begin
+    using Pkg
+    @test_throws "mutually exclusive" mwe(
+        "1 + 1";
+        manifest_path = "/nonexistent/Manifest.toml",
+        packagespecs = [PackageSpec(name = "Example")],
+    )
+end
+
 @testitem "mwe() with explicit string" tags=[:unit, :fast] begin
     result = mwe("x = 7\nx * 3"; temp = false, newprocess = false, advertise = false)
     @test result isa MWEResult
@@ -419,6 +440,16 @@ end
     @test !contains(result.md, "julia>")
 end
 
+@testitem "@mwe: final bare literal shown as #> (newprocess)" tags=[:integration, :slow] begin
+    result = @mwe begin
+        x = 5
+        42
+    end temp=false newprocess=true manifest=false advertise=false
+    @test result isa MWEResult
+    @test contains(result.md, "#> 42")
+    @test !contains(result.md, "#> 5")
+end
+
 @testitem "@mwe: manifest=false omits details block" tags=[:integration, :slow] begin
     result = @mwe begin
         1 + 1
@@ -485,4 +516,26 @@ end
         Pkg.activate(; io = devnull)   # restore default env
         rm(ref_dir; recursive = true)
     end
+end
+
+@testitem "@mwe: imported package with alias" tags=[:integration, :slow] begin
+    result = @mwe begin
+        import Statistics: mean as my_mean
+        x = [1, 2, 3]
+        my_mean(x)
+    end
+    @test result isa MWEResult
+    @test contains(result.md, "import Statistics: mean as my_mean")
+    @test contains(result.md, "my_mean(x)")
+    @test contains(result.md, "#> 2.0")
+
+    result = @mwe begin
+        import Statistics as Stats
+        x = [1, 2, 3]
+        Stats.mean(x)
+    end
+    @test result isa MWEResult
+    @test contains(result.md, "import Statistics as Stats")
+    @test contains(result.md, "Stats.mean(x)")
+    @test contains(result.md, "#> 2.0")
 end
