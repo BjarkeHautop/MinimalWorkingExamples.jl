@@ -3,6 +3,10 @@ uuid = "1cd72250-7741-5363-ad87-1e7986b7dfb4"
 authors = ["Bjarke Hautop Kristensen <bjarke.hautop@gmail.com>"]
 version = "0.1.0"
 
+[deps]
+InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
+Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+
 [workspace]
 projects = ["test", "docs"]
 
