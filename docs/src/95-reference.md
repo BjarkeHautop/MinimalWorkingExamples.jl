@@ -12,6 +12,8 @@ Pages = ["95-reference.md"]
 Pages = ["95-reference.md"]
 ```
 
-```@autodocs
-Modules = [MinimalWorkingExamples]
+```@docs
+@mwe
+mwe
+MWEResult
 ```

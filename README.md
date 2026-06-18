@@ -43,10 +43,19 @@ mean(x)
 #> 3.0
 ```
 
-<sup>Created on <date> with [MinimalWorkingExamples.jl](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia <version></sup>
+<sup>Created on <date> with [MinimalWorkingExamples v<pkg-version>](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia <version></sup>
 ````
 
-The value of the last expression is shown as `#>`, as are any `print`/`println` calls anywhere in the code.
+The value of the last expression is shown as `#>`, as are any `print`/`println` calls and log messages (`@warn`, `@info`) in the code.
+
+The result is returned as a `MWEResult`, so you can access the Markdown string directly if the clipboard is unavailable:
+
+```julia
+result = @mwe begin
+    1 + 1
+end
+print(result.md)  # print the Markdown string
+```
 
 `mwe()` is the function version of the macro. If the first argument is not given, code is read from the clipboard.
 
@@ -94,3 +103,11 @@ Pass `manifest_path` to use an existing `Manifest.toml` as-is.
     Example.hello("World")
 end manifest_path="/path/to/your/Manifest.toml"
 ```
+
+## To Do
+
+- Allow the user to set different defaults using Preferences.jl?
+
+- Allow user to pass either Manifest.toml or Project.toml instead of only Manifest.toml? Probably just a single shared arg?
+
+- Support plots like reprex does? (low priority?)

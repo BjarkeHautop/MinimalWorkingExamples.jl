@@ -6,9 +6,18 @@ CurrentModule = MinimalWorkingExamples
 
 Turn a snippet of Julia code into a shareable, self-contained Markdown block — ready to paste into a GitHub issue, Discourse post, or Slack message. Inspired by the R package [reprex](https://reprex.tidyverse.org/).
 
+## Installation
+
+Not yet registered. Install directly from GitHub:
+
+```julia
+using Pkg
+Pkg.add(url="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl")
+```
+
 ## Basic usage
 
-Write your code in a `begin...end` block and pass it to `@mwe`:
+Write your code in a `begin...end` block and pass it to [`@mwe`](@ref):
 
 ```julia
 using MinimalWorkingExamples
@@ -30,12 +39,21 @@ mean(x)
 #> 3.0
 ```
 
-<sup>Created on <date> with [MinimalWorkingExamples.jl](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia <version></sup>
+<sup>Created on <date> with [MinimalWorkingExamples v<pkg-version>](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia <version></sup>
 ````
 
-The value of the last expression is shown as `#>`, as are any `print`/`println` calls anywhere in the code.
+The value of the last expression is shown as `#>`, as are any `print`/`println` calls and log messages (`@warn`, `@info`) in the code.
 
-`mwe()` is the function version of the macro. If the first argument is not given, code is read from the clipboard.
+The result is returned as a [`MWEResult`](@ref), so you can access the Markdown string directly if the clipboard is unavailable:
+
+```julia
+result = @mwe begin
+    1 + 1
+end
+print(result.md)  # print the Markdown string
+```
+
+[`mwe()`](@ref) is the function version of the macro. If the first argument is not given, code is read from the clipboard.
 
 ## Including environment details
 
