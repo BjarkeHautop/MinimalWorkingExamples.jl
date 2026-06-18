@@ -87,6 +87,102 @@ end
     @test !contains(result.md, "julia>")
 end
 
+@testitem "venue=:gh uses julia language tag" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "1 + 1";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+        venue = :gh,
+    )
+    @test startswith(result.md, "```julia\n")
+end
+
+@testitem "venue=:slack strips language tag" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "1 + 1";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+        venue = :slack,
+    )
+    @test startswith(result.md, "```\n")
+    @test !contains(result.md, "```julia")
+end
+
+@testitem "venue=:slack defaults advertise to false" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "1 + 1";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        packagespecs = [],
+        venue = :slack,
+    )
+    @test !contains(result.md, "<sup>")
+end
+
+@testitem "venue=:gh defaults advertise to true" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "1 + 1";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        packagespecs = [],
+        venue = :gh,
+    )
+    @test contains(result.md, "<sup>")
+end
+
+@testitem "footer note: in-process when newprocess=false" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "1 + 1";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = true,
+        packagespecs = [],
+    )
+    @test contains(result.md, "in-process")
+end
+
+@testitem "footer note: pinned packages" tags=[:unit, :fast] begin
+    using Pkg
+    result = MinimalWorkingExamples._run_mwe(
+        "1 + 1";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = true,
+        packagespecs = [PackageSpec(name = "Example", version = "0.5.3")],
+    )
+    @test contains(result.md, "pinned:")
+    @test contains(result.md, "Example@0.5.3")
+end
+
+@testitem "footer note: from existing Manifest.toml" tags=[:unit, :fast] begin
+    manifest_file = tempname() * ".toml"
+    write(manifest_file, "# placeholder")
+    try
+        result = MinimalWorkingExamples._run_mwe(
+            "1 + 1";
+            temp = false,
+            newprocess = false,
+            manifest = false,
+            advertise = true,
+            packagespecs = [],
+            manifest_path = manifest_file,
+        )
+        @test contains(result.md, "from existing Manifest.toml")
+    finally
+        rm(manifest_file; force = true)
+    end
+end
+
 @testitem "advertise=true appends footer" tags=[:unit, :fast] begin
     result = MinimalWorkingExamples._run_mwe(
         "1 + 1";
@@ -112,6 +208,26 @@ end
     )
     @test !contains(result.md, "MinimalWorkingExamples.jl")
     @test !contains(result.md, "<sup>")
+end
+
+# ── mwe() function form ───────────────────────────────────────────────────────
+
+@testitem "mwe() with explicit string" tags=[:unit, :fast] begin
+    result = mwe("x = 7\nx * 3"; temp = false, newprocess = false, advertise = false)
+    @test result isa MWEResult
+    @test contains(result.md, "x = 7")
+    @test contains(result.md, "#> 21")
+end
+
+# ── _describe_packagespec ──────────────────────────────────────────────────────
+
+@testitem "_describe_packagespec" tags=[:unit, :fast] begin
+    using Pkg
+    using MinimalWorkingExamples: _describe_packagespec
+
+    @test _describe_packagespec(PackageSpec(name = "Foo", version = "1.2.3")) == "Foo@1.2.3"
+    @test _describe_packagespec(PackageSpec(name = "Foo")) == "Foo"
+    @test _describe_packagespec(PackageSpec(name = "Foo", rev = "main")) == "Foo#main"
 end
 
 # ── newprocess=true (subprocess) ──────────────────────────────────────────────
