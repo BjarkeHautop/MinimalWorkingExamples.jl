@@ -46,7 +46,7 @@ end
 ```
 
 Produces (copied to clipboard):
-
+````markdown
 ```julia
 using Statistics
 x = [1, 2, 3, 4, 5]
@@ -55,7 +55,7 @@ mean(x)
 ```
 
 <sup>Created on <date> with [MinimalWorkingExamples v<pkg-version>](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia <version></sup>
-
+````
 Pin a package to a specific version:
 
 ```julia
