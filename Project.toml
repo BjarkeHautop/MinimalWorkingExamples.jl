@@ -1,0 +1,10 @@
+name = "MinimalWorkingExamples"
+uuid = "1cd72250-7741-5363-ad87-1e7986b7dfb4"
+authors = ["Bjarke Hautop Kristensen <bjarke.hautop@gmail.com>"]
+version = "0.1.0"
+
+[workspace]
+projects = ["test", "docs"]
+
+[compat]
+julia = "1.10"
