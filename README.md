@@ -107,12 +107,6 @@ using Pkg
     using Example
     Example.hello("World")
 end packagespecs=[PackageSpec(name="Example", version="0.5.3")]
-
-# Use a PR branch directly from GitHub
-@mwe begin
-    using MyPackage
-    MyPackage.new_feature()
-end packagespecs=[PackageSpec(url="https://github.com/user/MyPackage.jl", rev="my-fix-branch")]
 ```
 
 Pinned packages are noted in the footer: `· pinned: Example@0.5.3`.

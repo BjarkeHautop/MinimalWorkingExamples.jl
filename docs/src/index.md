@@ -170,20 +170,30 @@ Use `packagespecs` to pin one or more packages to a particular version, git revi
 ```julia
 using Pkg
 
-# Pin to a specific version
 @mwe begin
     using Example
     Example.hello("World")
 end packagespecs=[PackageSpec(name="Example", version="0.5.3")]
-
-# Use a PR branch directly from GitHub
-@mwe begin
-    using MyPackage
-    MyPackage.new_feature()
-end packagespecs=[PackageSpec(url="https://github.com/user/MyPackage.jl", rev="my-fix-branch")]
 ```
 
-Pinned packages are noted in the footer: `· pinned: Example@0.5.3`.
+Output:
+
+```@raw html
+<div class="gh-output">
+```
+
+```julia
+using Example
+Example.hello("World")
+#> "Hello, World!"
+```
+
+```@raw html
+<small>Created on 2026-06-18 with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v0.1.0</a> using Julia 1.12.6 · pinned: Example@0.5.3</small>
+</div>
+```
+
+For more details on packagespecs options see [`Pkg.PackageSpec` documentation](https://pkgdocs.julialang.org/v1/api/#Pkg.PackageSpec).
 
 ## Reproducing an exact environment
 
