@@ -33,14 +33,21 @@ end
 
 This runs the code as a script in a fresh Julia process with a clean temporary environment, copies the result to your clipboard, and prints it:
 
-````markdown
+```@raw html
+<div class="gh-output">
+```
+
 ```julia
 using Statistics
 x = [1, 2, 3, 4, 5]
 mean(x)
 #> 3.0
 ```
-````
+
+```@raw html
+<small>Created on 2026-06-18 with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v0.1.0</a> using Julia 1.12.6</small>
+</div>
+```
 
 The value of the last expression is shown as `#>`, as are any `print` calls and log messages (`@warn`, `@info`) in the code.
 
@@ -94,13 +101,20 @@ end
 
 Output:
 
-````markdown
+```@raw html
+<div class="gh-output">
+```
+
 ```julia
 x = [1, 2, 3]
 x[10]
 #> ERROR: BoundsError: attempt to access 3-element Vector{Int64} at index [10]
 ```
-````
+
+```@raw html
+<small>Created on 2026-06-18 with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v0.1.0</a> using Julia 1.12.6</small>
+</div>
+```
 
 Stacktrace can be included by passing `stacktrace=true`:
 
@@ -114,7 +128,10 @@ end stacktrace=true
 
 Output:
 
-````markdown
+```@raw html
+<div class="gh-output">
+```
+
 ```julia
 x = [1, 2, 3]
 x[10]
@@ -128,7 +145,11 @@ x[10]
 #>  [3] top-level scope
 #>    @ none:1
 ```
-````
+
+```@raw html
+<small>Created on 2026-06-18 with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v0.1.0</a> using Julia 1.12.6</small>
+</div>
+```
 
 ## Including environment details
 

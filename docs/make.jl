@@ -9,10 +9,7 @@ DocMeta.setdocmeta!(
 )
 
 # Add titles of sections and overrides page titles
-const titles = Dict(
-    # "10-tutorials" => "Tutorials", # example folder title
-    "91-developer.md" => "Developer docs",
-)
+const titles = Dict("91-developer.md" => "Developer docs")
 
 function recursively_list_pages(folder; path_prefix = "")
     pages_list = Any[]
@@ -70,6 +67,7 @@ makedocs(;
     sitename = "MinimalWorkingExamples.jl",
     format = Documenter.HTML(;
         canonical = "https://BjarkeHautop.github.io/MinimalWorkingExamples.jl",
+        assets = ["assets/gh-output.css"],
     ),
     pages = list_pages(),
 )
