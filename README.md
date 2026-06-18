@@ -59,6 +59,30 @@ print(result.md)  # print the Markdown string
 
 `mwe()` is the function version of the macro. If the first argument is not given, code is read from the clipboard.
 
+## Errors
+
+If the code throws an error, it is captured and shown as a `#>` comment — execution stops at that line:
+
+```julia
+@mwe begin
+    x = [1, 2, 3]
+    x[10]
+    x[1]  # never reached
+end
+```
+
+Output:
+
+````markdown
+```julia
+x = [1, 2, 3]
+x[10]
+#> ERROR: BoundsError: attempt to access 3-element Vector{Int64} at index [10]
+```
+
+<sup>Created on <date> with [MinimalWorkingExamples v<pkg-version>](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia <version></sup>
+````
+
 ## Including environment details
 
 Pass `manifest=true` to append the full `Manifest.toml` in a collapsible block, so anyone can reproduce your exact package versions:
