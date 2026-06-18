@@ -1,6 +1,7 @@
 module MinimalWorkingExamples
 
 using Dates: today
+using Logging
 using Pkg
 using InteractiveUtils: clipboard
 
@@ -165,12 +166,20 @@ Base.String(r::MWEResult) = r.md
 
 # ── Macro helpers ──────────────────────────────────────────────────────────────
 
+# Base.remove_linenums! strips LineNumberNodes from :block/:quote but leaves
+# them in macrocall arg lists.
+# string() then prints them as ` #= file:line =#` annotations. Strip those.
+function _expr_to_display_string(ex::Expr)
+    s = string(Base.remove_linenums!(deepcopy(ex)))
+    return replace(s, r"#= [^\n=]*:\d+ =# ?" => "")
+end
+
 function _block_to_code_string(ex::Expr)
     ex.head == :block || error("@mwe expects a begin...end block")
     lines = String[]
     for arg in ex.args
         arg isa LineNumberNode && continue
-        push!(lines, string(Base.remove_linenums!(deepcopy(arg))))
+        push!(lines, _expr_to_display_string(arg))
     end
     return join(lines, "\n")
 end
@@ -286,11 +295,18 @@ end
 
 function _build_driver_script(code_str::AbstractString)
     return """
+    using Logging
+
     function _mwe_prefix_output(str)
         isempty(str) && return
         for line in split(rstrip(str, '\\n'), '\\n')
             println("#> ", line)
         end
+    end
+
+    function _mwe_to_display_string(ex::Expr)
+        s = string(Base.remove_linenums!(deepcopy(ex)))
+        return replace(s, r"#= [^\\n=]*:\\d+ =# ?" => "")
     end
 
     const _mwe_code = $(repr(code_str))
@@ -300,25 +316,33 @@ function _build_driver_script(code_str::AbstractString)
             _mwe_prefix_output("ERROR: " * sprint(showerror, _mwe_node.args[1]))
             break
         end
-        _mwe_ex = Base.remove_linenums!(deepcopy(_mwe_node))
-        println(string(_mwe_ex))
+        println(_mwe_to_display_string(_mwe_node))
 
-        _mwe_original = Base.stdout
-        _mwe_rd, _mwe_wr = redirect_stdout()
+        _mwe_original_out = Base.stdout
+        _mwe_original_err = Base.stderr
+        _mwe_rd_out, _mwe_wr_out = redirect_stdout()
+        _mwe_rd_err, _mwe_wr_err = redirect_stderr()
         local _mwe_val = nothing
         local _mwe_err = nothing
         try
-            _mwe_val = Base.invokelatest(Core.eval, Main, _mwe_node)
+            _mwe_val = with_logger(ConsoleLogger(_mwe_wr_err, Logging.Info)) do
+                Base.invokelatest(Core.eval, Main, _mwe_node)
+            end
         catch _e
             _mwe_err = _e
         finally
-            redirect_stdout(_mwe_original)
-            close(_mwe_wr)
+            redirect_stdout(_mwe_original_out)
+            redirect_stderr(_mwe_original_err)
+            close(_mwe_wr_out)
+            close(_mwe_wr_err)
         end
-        _mwe_captured = read(_mwe_rd, String)
-        close(_mwe_rd)
+        _mwe_captured_out = read(_mwe_rd_out, String)
+        _mwe_captured_err = read(_mwe_rd_err, String)
+        close(_mwe_rd_out)
+        close(_mwe_rd_err)
 
-        _mwe_prefix_output(_mwe_captured)
+        _mwe_prefix_output(_mwe_captured_out)
+        _mwe_prefix_output(_mwe_captured_err)
         if !isnothing(_mwe_err)
             _mwe_prefix_output("ERROR: " * sprint(showerror, _mwe_err))
             break
@@ -403,21 +427,29 @@ function _run_in_new_process(
 end
 
 function _capture_eval(ex::Expr)
-    original = Base.stdout
-    rd, wr = redirect_stdout()
+    original_out = Base.stdout
+    original_err = Base.stderr
+    rd_out, wr_out = redirect_stdout()
+    rd_err, wr_err = redirect_stderr()
     local val = nothing
     local err = nothing
     try
-        val = Base.invokelatest(Core.eval, Main, ex)
+        val = Logging.with_logger(Logging.ConsoleLogger(wr_err, Logging.Info)) do
+            Base.invokelatest(Core.eval, Main, ex)
+        end
     catch e
         err = e
     finally
-        redirect_stdout(original)
-        close(wr)
+        redirect_stdout(original_out)
+        redirect_stderr(original_err)
+        close(wr_out)
+        close(wr_err)
     end
-    captured = read(rd, String)
-    close(rd)
-    return val, captured, err
+    captured_out = read(rd_out, String)
+    captured_err = read(rd_err, String)
+    close(rd_out)
+    close(rd_err)
+    return val, captured_out, captured_err, err
 end
 
 function _prefix_lines(io::IO, str::AbstractString, prefix::AbstractString)
@@ -436,10 +468,11 @@ function _run_in_current_process(code_str::AbstractString)
             _prefix_lines(buf, "ERROR: " * sprint(showerror, node.args[1]), "#> ")
             break
         end
-        ex_str = string(Base.remove_linenums!(deepcopy(node)))
-        val, captured, err = _capture_eval(node)
+        ex_str = _expr_to_display_string(node)
+        val, captured_out, captured_err, err = _capture_eval(node)
         println(buf, ex_str)
-        _prefix_lines(buf, captured, "#> ")
+        _prefix_lines(buf, captured_out, "#> ")
+        _prefix_lines(buf, captured_err, "#> ")
         if !isnothing(err)
             _prefix_lines(buf, "ERROR: " * sprint(showerror, err), "#> ")
             break
@@ -500,7 +533,7 @@ function _run_mwe(
         clipboard(md)
         @info "MWE copied to clipboard!"
     catch
-        @warn "Could not copy to clipboard — printing only."
+        @info "Could not copy to clipboard — printing only."
     end
     println(md)
     return MWEResult(md)

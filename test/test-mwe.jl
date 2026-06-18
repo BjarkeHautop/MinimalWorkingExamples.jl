@@ -239,6 +239,58 @@ end
     @test contains(result.md, "something went wrong")
 end
 
+@testitem "@warn captured as #>" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "@warn \"something fishy\"";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+    )
+    @test contains(result.md, "#> ")
+    @test contains(result.md, "Warning")
+    @test contains(result.md, "something fishy")
+end
+
+@testitem "@info captured as #>" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "@info \"all good\"";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+    )
+    @test contains(result.md, "#> ")
+    @test contains(result.md, "Info")
+    @test contains(result.md, "all good")
+end
+
+@testitem "@warn in function body: no #= ... =# in output" tags=[:unit, :fast] begin
+    code = """
+    function my_warn_function()
+        @warn("This is a warning")
+    end
+    my_warn_function()
+    1 + 1
+    my_warn_function()
+    2 + 2
+    """
+    result = MinimalWorkingExamples._run_mwe(
+        code;
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+    )
+    @test !contains(result.md, "#=")          # no LineNumberNode annotations
+    @test contains(result.md, "@warn \"This is a warning\"")
+    @test count("#> ┌ Warning: This is a warning", result.md) == 2  # fires twice
+    @test contains(result.md, "#> 4")          # last expression value shown
+end
+
 @testitem "error stops execution of subsequent expressions" tags=[:unit, :fast] begin
     result = MinimalWorkingExamples._run_mwe(
         "error(\"oops\")\n1 + 1";
