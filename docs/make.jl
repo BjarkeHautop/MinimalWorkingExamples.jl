@@ -9,7 +9,8 @@ DocMeta.setdocmeta!(
 )
 
 # Add titles of sections and overrides page titles
-const titles = Dict("91-developer.md" => "Developer docs")
+const titles =
+    Dict("10-writing-mwes.md" => "Writing MWEs", "91-developer.md" => "Developer docs")
 
 function recursively_list_pages(folder; path_prefix = "")
     pages_list = Any[]
