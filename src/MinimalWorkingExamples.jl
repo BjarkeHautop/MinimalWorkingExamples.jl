@@ -54,7 +54,7 @@ mean(x)
 #> 3.0
 ```
 
-<sup>Created on <date> with [MinimalWorkingExamples.jl](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) v<pkg-version> using Julia <version></sup>
+<sup>Created on <date> with [MinimalWorkingExamples v<pkg-version>](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia <version></sup>
 
 Pin a package to a specific version:
 
@@ -526,7 +526,7 @@ function _run_mwe(
             push!(notes, "pinned: " * join(_describe_packagespec.(packagespecs), ", "))
         end
         extra = isempty(notes) ? "" : " · " * join(notes, " · ")
-        md *= "\n\n<sup>Created on $(today()) with [MinimalWorkingExamples.jl](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) v$(pkgversion(MinimalWorkingExamples)) using Julia $VERSION$extra</sup>"
+        md *= "\n\n<sup>Created on $(today()) with [MinimalWorkingExamples v$(pkgversion(MinimalWorkingExamples))](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia $VERSION$extra</sup>"
     end
 
     try
