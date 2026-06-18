@@ -9,7 +9,7 @@ export @mwe, mwe, MWEResult
 """
     @mwe begin
         code
-    end [venue=:gh] [temp=true] [newprocess=true] [manifest=false] [advertise=nothing] [packagespecs=PackageSpec[]] [manifest_path=nothing]
+    end [venue=:gh] [temp=true] [newprocess=true] [manifest=false] [advertise=nothing] [packagespecs=PackageSpec[]] [manifest_path=nothing] [verbose=false]
 
 Generate a Minimal Working Example (MWE) formatted as Markdown, then copy it to the clipboard.
 
@@ -17,10 +17,10 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
 (and any `print`/`println` calls) shown as `#>` comments.
 
 # Keyword arguments
-- `temp=true`: run in a temporary environment; packages from `using`/`import` are auto-added
-- `newprocess=true`: run the MWE in a fresh Julia process for reproducibility
 - `venue=:gh`: output format — `:gh` for GitHub-Flavored Markdown (default), `:slack` for Slack
   (strips the language identifier from the code fence)
+- `temp=true`: run in a temporary environment; packages from `using`/`import` are auto-added
+- `newprocess=true`: run the MWE in a fresh Julia process for reproducibility
 - `manifest=false`: append the `Manifest.toml` in a collapsible `<details>` block
 - `advertise`: append a footer noting the date, this package, and Julia version used.
   Defaults to `true` for `:gh` and `false` for `:slack`; can be set explicitly to override.
