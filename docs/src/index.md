@@ -53,7 +53,32 @@ end
 print(result.md)  # print the Markdown string
 ```
 
-[`mwe()`](@ref) is the function version of the macro. If the first argument is not given, code is read from the clipboard.
+[`mwe()`](@ref) is the function version of the macro. It accepts the same keyword arguments as `@mwe`.
+If `code` is omitted, it reads Julia source from the clipboard:
+
+```julia
+# Copy some Julia code to your clipboard, then:
+mwe()
+
+# Or pass a string directly:
+mwe("""
+using Statistics
+mean([1, 2, 3])
+""")
+```
+
+## Venue
+
+The `venue` keyword controls the output format. Use `:gh` (default) for GitHub, Discourse, and other
+platforms that render GitHub-Flavored Markdown, and `:slack` for Slack.
+
+```julia
+@mwe begin
+    1 + 1
+end venue=:slack
+```
+
+`:slack` strips the language identifier from the code fence (Slack doesn't render language-tagged fences) and omits the attribution footer.
 
 ## Including environment details
 

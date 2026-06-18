@@ -154,7 +154,7 @@ end
     MWEResult
 
 Wraps the Markdown string produced by `@mwe`. Displays silently in the REPL
-access the raw string via `.md`.
+(the output is already printed on creation); access the Markdown string via `.md`.
 """
 struct MWEResult
     md::String
