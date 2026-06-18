@@ -15,14 +15,14 @@ export @mwe, mwe, MWEResult
 Generate a Minimal Working Example (MWE) formatted as Markdown, then copy it to the clipboard.
 
 The code is rendered as a copy-pasteable Julia script with the output of the final expression
-(and any `print`/`println` calls) shown as `#>` comments.
+(and any `print`/logging calls) shown as `#>` comments.
 
 # Keyword arguments
 - `venue=:gh`: output format — `:gh` for GitHub-Flavored Markdown (default), `:slack` for Slack
-  (strips the language identifier from the code fence)
-- `temp=true`: run in a temporary environment; packages from `using`/`import` are auto-added
-- `newprocess=true`: run the MWE in a fresh Julia process for reproducibility
-- `manifest=false`: append the `Manifest.toml` in a collapsible `<details>` block
+  (strips the language identifier from the code fence).
+- `temp=true`: run in a temporary environment; packages from `using`/`import` are auto-added.
+- `newprocess=true`: run the MWE in a fresh Julia process for reproducibility.
+- `manifest=false`: append the `Manifest.toml` in a collapsible `<details>` block.
 - `advertise`: append a footer noting the date, this package, and Julia version used.
   Defaults to `true` for `:gh` and `false` for `:slack`; can be set explicitly to override.
 - `packagespecs=PackageSpec[]`: vector of [`Pkg.PackageSpec`](https://pkgdocs.julialang.org/v1/api/#Pkg.PackageSpec)s for packages that need a specific
@@ -31,7 +31,7 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
   `Pkg.add` is skipped entirely and `Pkg.instantiate()` reproduces the exact environment.
   Mutually exclusive with `packagespecs`.
 - `verbose=false`: if `true`, show Pkg output (downloads, resolver messages) during environment
-  setup. Suppressed by default.
+  setup.
 
 # Examples
 
