@@ -108,6 +108,4 @@ end manifest_path="/path/to/your/Manifest.toml"
 
 - Allow the user to set different defaults using Preferences.jl?
 
-- Allow user to pass either Manifest.toml or Project.toml instead of only Manifest.toml? Probably just a single shared arg?
-
 - Support plots like reprex does? (low priority?)
