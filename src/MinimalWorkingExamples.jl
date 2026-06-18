@@ -402,7 +402,10 @@ function _setup_temp_env!(
     end
 
     julia_exe = joinpath(Sys.BINDIR, Base.julia_exename())
-    cmd = `$julia_exe --project=$tmpdir --startup-file=no -e $setup_script`
+    cmd = addenv(
+        `$julia_exe --project=$tmpdir --startup-file=no -e $setup_script`,
+        "JULIA_LOAD_PATH" => "@:@stdlib",
+    )
     verbose ? run(cmd) : run(pipeline(cmd; stdout = devnull, stderr = devnull))
 end
 
@@ -426,6 +429,7 @@ function _run_in_new_process(
         julia_exe = joinpath(Sys.BINDIR, Base.julia_exename())
         project_flag = temp ? "--project=$tmpdir" : "--project=@."
         cmd = `$julia_exe $project_flag --startup-file=no -q $script_path`
+        temp && (cmd = addenv(cmd, "JULIA_LOAD_PATH" => "@:@stdlib"))
 
         repl_output = try
             readchomp(cmd)

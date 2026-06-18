@@ -352,6 +352,25 @@ end
     @test _describe_packagespec(PackageSpec(name = "Foo", rev = "main")) == "Foo#main"
 end
 
+# ── sandbox isolation ─────────────────────────────────────────────────────────
+
+@testitem "sandbox: subprocess LOAD_PATH excludes global environment" tags=[
+    :integration,
+    :slow,
+] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "println(Base.LOAD_PATH)";
+        temp = true,
+        newprocess = true,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+    )
+    # @v#.# in LOAD_PATH lets globally-installed packages leak into the MWE
+    # without being declared in packagespecs — this test fails until the fix
+    @test !contains(result.md, "@v")
+end
+
 # ── newprocess=true (subprocess) ──────────────────────────────────────────────
 
 @testitem "newprocess=true: error shown as #> ERROR:" tags=[:integration, :slow] begin
