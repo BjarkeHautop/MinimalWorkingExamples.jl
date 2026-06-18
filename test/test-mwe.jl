@@ -182,3 +182,16 @@ end
     @test contains(result.md, "<details>")
     @test contains(result.md, "Example")
 end
+
+@testitem "@mwe: packagespecs pins a specific version" tags=[:integration, :slow] begin
+    using Pkg
+    result = @mwe begin
+        using Example
+        Example.hello("World")
+    end temp=true newprocess=true manifest=true advertise=false packagespecs=[
+        PackageSpec(name = "Example", version = "0.5.3"),
+    ]
+    @test result isa MWEResult
+    @test contains(result.md, "Hello, World")
+    @test contains(result.md, "0.5.3")   # pinned version appears in Manifest
+end

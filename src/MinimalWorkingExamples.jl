@@ -14,16 +14,22 @@ export @mwe, MWEResult
 Generate a Minimal Working Example (MWE) formatted as Markdown, then copy it to the clipboard.
 
 The code is rendered as a copy-pasteable Julia script with the output of the final expression
-(and any `print`/`println` calls) shown as `#>` comments — the same format as R's reprex package.
+(and any `print`/`println` calls) shown as `#>` comments.
 
 # Keyword arguments
 - `temp=true`: run in a temporary environment; packages from `using`/`import` are auto-added
 - `newprocess=true`: run the MWE in a fresh Julia process for reproducibility
 - `manifest=false`: append the `Manifest.toml` in a collapsible `<details>` block
-- `advertise=true`: append a footer noting the date and Julia version used
-- `packagespecs=PackageSpec[]`: additional `PackageSpec`s (useful for specific versions, PRs, URLs)
+- `advertise=true`: append a footer noting the date, this package, and Julia version used
+- `packagespecs=PackageSpec[]`: vector of `Pkg.PackageSpec`s for packages that need a specific
+  version, git revision, URL, or local path — instead of the latest registered version.
+  Useful for creating MWEs of unmerged PRs or pre-release fixes. Any package named here
+  overrides the auto-detected version from `using`/`import`.
 
 # Examples
+
+Basic usage:
+
 ```julia
 @mwe begin
     using Statistics
@@ -39,6 +45,28 @@ using Statistics
 x = [1, 2, 3, 4, 5]
 mean(x)
 #> 3.0
+```
+
+<sup>Created on <date> with MinimalWorkingExamples.jl using Julia <version></sup>
+
+Pin a package to a specific version (e.g. to reproduce a bug fixed in the next release):
+
+```julia
+using Pkg
+@mwe begin
+    using Example
+    Example.hello("World")
+end packagespecs=[PackageSpec(name="Example", version="0.5.3")]
+```
+
+Use a PR branch directly from GitHub:
+
+```julia
+using Pkg
+@mwe begin
+    using MyPackage
+    MyPackage.new_feature()
+end packagespecs=[PackageSpec(url="https://github.com/user/MyPackage.jl", rev="my-fix-branch")]
 ```
 """
 macro mwe(ex, kwargs...)
@@ -135,10 +163,19 @@ function _repr_packagespec(spec::Pkg.PackageSpec)
         push!(parts, "name=$(repr(n))")
     (u = _get(() -> spec.uuid); !isnothing(u)) && push!(parts, "uuid=$(repr(string(u)))")
 
-    url = something(_get(() -> spec.repo.source), _get(() -> spec.url), nothing)
+    let v = _get(() -> spec.version)
+        if !isnothing(v)
+            v_str = string(v)
+            (!isempty(v_str) && v_str != "*") && push!(parts, "version=$(repr(v_str))")
+        end
+    end
+
+    url = _get(() -> spec.repo.source)
+    isnothing(url) && (url = _get(() -> spec.url))
     (!isnothing(url) && !isempty(url)) && push!(parts, "url=$(repr(url))")
 
-    rev = something(_get(() -> spec.repo.rev), _get(() -> spec.rev), nothing)
+    rev = _get(() -> spec.repo.rev)
+    isnothing(rev) && (rev = _get(() -> spec.rev))
     (!isnothing(rev) && !isempty(rev)) && push!(parts, "rev=$(repr(rev))")
 
     (p = _get(() -> spec.path); !isnothing(p) && !isempty(p)) &&
@@ -196,6 +233,9 @@ function _setup_temp_env!(
     packagespecs::Vector,
 )
     packages = _extract_packages(code_str)
+
+    spec_names = Set(s.name for s in packagespecs if !isnothing(s.name) && !isempty(s.name))
+    packages = filter(p -> p ∉ spec_names, packages)
 
     add_stmts = String[]
     isempty(packages) || push!(add_stmts, "Pkg.add([$(join(repr.(packages), ", "))])")
