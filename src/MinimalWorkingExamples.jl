@@ -31,6 +31,8 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
 - `manifest_path=nothing`: path to an existing `Manifest.toml` to use as-is. When set,
   `Pkg.add` is skipped entirely and `Pkg.instantiate()` reproduces the exact environment.
   Mutually exclusive with `packagespecs`.
+- `verbose=false`: if `true`, show Pkg output (downloads, resolver messages) during environment
+  setup. Suppressed by default.
 
 # Examples
 
@@ -95,6 +97,7 @@ macro mwe(ex, kwargs...)
             advertise = $(get(kw, :advertise, nothing)),
             packagespecs = $(get(kw, :packagespecs, :(Pkg.PackageSpec[]))),
             manifest_path = $(get(kw, :manifest_path, nothing)),
+            verbose = $(get(kw, :verbose, false)),
         )
     end
 end
@@ -131,6 +134,7 @@ function mwe(
     advertise::Union{Bool,Nothing} = nothing,
     packagespecs::Vector = Pkg.PackageSpec[],
     manifest_path::Union{AbstractString,Nothing} = nothing,
+    verbose::Bool = false,
 )
     _run_mwe(
         code;
@@ -141,6 +145,7 @@ function mwe(
         advertise,
         packagespecs,
         manifest_path,
+        verbose,
     )
 end
 
@@ -324,7 +329,8 @@ function _setup_temp_env!(
     tmpdir::AbstractString,
     code_str::AbstractString,
     packagespecs::Vector,
-    manifest_path::Union{AbstractString,Nothing} = nothing,
+    manifest_path::Union{AbstractString,Nothing} = nothing;
+    verbose::Bool = false,
 )
     if !isnothing(manifest_path)
         cp(manifest_path, joinpath(tmpdir, "Manifest.toml"))
@@ -347,7 +353,8 @@ function _setup_temp_env!(
     end
 
     julia_exe = joinpath(Sys.BINDIR, Base.julia_exename())
-    run(`$julia_exe --project=$tmpdir --startup-file=no -e $setup_script`)
+    cmd = `$julia_exe --project=$tmpdir --startup-file=no -e $setup_script`
+    verbose ? run(cmd) : run(pipeline(cmd; stdout = devnull, stderr = devnull))
 end
 
 # ── Execution backends ─────────────────────────────────────────────────────────
@@ -358,9 +365,10 @@ function _run_in_new_process(
     manifest::Bool = true,
     packagespecs::Vector = Pkg.PackageSpec[],
     manifest_path::Union{AbstractString,Nothing} = nothing,
+    verbose::Bool = false,
 )
     mktempdir() do tmpdir
-        temp && _setup_temp_env!(tmpdir, code_str, packagespecs, manifest_path)
+        temp && _setup_temp_env!(tmpdir, code_str, packagespecs, manifest_path; verbose)
 
         script_path = joinpath(tmpdir, "mwe_driver.jl")
         write(script_path, _build_driver_script(code_str))
@@ -440,12 +448,13 @@ function _run_mwe(
     advertise::Union{Bool,Nothing} = nothing,
     packagespecs::Vector = Pkg.PackageSpec[],
     manifest_path::Union{AbstractString,Nothing} = nothing,
+    verbose::Bool = false,
 )
     venue in (:gh, :slack) || error("venue must be :gh or :slack, got $(repr(venue))")
     _advertise = isnothing(advertise) ? (venue === :gh) : advertise
 
     repl_output, manifest_str = if newprocess
-        _run_in_new_process(code_str; temp, manifest, packagespecs, manifest_path)
+        _run_in_new_process(code_str; temp, manifest, packagespecs, manifest_path, verbose)
     else
         _run_in_current_process(code_str)
     end
