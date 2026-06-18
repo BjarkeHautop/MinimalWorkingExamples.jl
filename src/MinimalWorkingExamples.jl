@@ -296,14 +296,21 @@ function _build_driver_script(code_str::AbstractString)
     const _mwe_code = $(repr(code_str))
     const _mwe_nodes = [n for n in Meta.parseall(_mwe_code).args if !(n isa LineNumberNode)]
     for (i, _mwe_node) in enumerate(_mwe_nodes)
+        if _mwe_node isa Expr && _mwe_node.head === :error
+            _mwe_prefix_output("ERROR: " * sprint(showerror, _mwe_node.args[1]))
+            break
+        end
         _mwe_ex = Base.remove_linenums!(deepcopy(_mwe_node))
         println(string(_mwe_ex))
 
         _mwe_original = Base.stdout
         _mwe_rd, _mwe_wr = redirect_stdout()
-        local _mwe_val
+        local _mwe_val = nothing
+        local _mwe_err = nothing
         try
             _mwe_val = Base.invokelatest(Core.eval, Main, _mwe_node)
+        catch _e
+            _mwe_err = _e
         finally
             redirect_stdout(_mwe_original)
             close(_mwe_wr)
@@ -312,6 +319,10 @@ function _build_driver_script(code_str::AbstractString)
         close(_mwe_rd)
 
         _mwe_prefix_output(_mwe_captured)
+        if !isnothing(_mwe_err)
+            _mwe_prefix_output("ERROR: " * sprint(showerror, _mwe_err))
+            break
+        end
         if i == length(_mwe_nodes) && _mwe_val !== nothing
             _mwe_buf = IOBuffer()
             show(IOContext(_mwe_buf, :limit => true, :color => false), MIME"text/plain"(), _mwe_val)
@@ -394,16 +405,19 @@ end
 function _capture_eval(ex::Expr)
     original = Base.stdout
     rd, wr = redirect_stdout()
-    local val
+    local val = nothing
+    local err = nothing
     try
         val = Base.invokelatest(Core.eval, Main, ex)
+    catch e
+        err = e
     finally
         redirect_stdout(original)
         close(wr)
     end
     captured = read(rd, String)
     close(rd)
-    return val, captured
+    return val, captured, err
 end
 
 function _prefix_lines(io::IO, str::AbstractString, prefix::AbstractString)
@@ -418,10 +432,18 @@ function _run_in_current_process(code_str::AbstractString)
     nodes =
         [n for n in Meta.parseall(code_str).args if !(n isa LineNumberNode) && n isa Expr]
     for (i, node) in enumerate(nodes)
+        if node.head === :error
+            _prefix_lines(buf, "ERROR: " * sprint(showerror, node.args[1]), "#> ")
+            break
+        end
         ex_str = string(Base.remove_linenums!(deepcopy(node)))
-        val, captured = _capture_eval(node)
+        val, captured, err = _capture_eval(node)
         println(buf, ex_str)
         _prefix_lines(buf, captured, "#> ")
+        if !isnothing(err)
+            _prefix_lines(buf, "ERROR: " * sprint(showerror, err), "#> ")
+            break
+        end
         if i == length(nodes) && val !== nothing
             val_buf = IOBuffer()
             show(

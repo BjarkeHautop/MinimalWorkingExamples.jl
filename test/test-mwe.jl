@@ -211,6 +211,47 @@ end
     @test !contains(result.md, "<sup>")
 end
 
+# ── error handling ────────────────────────────────────────────────────────────
+
+@testitem "parse error shown cleanly as #> ERROR:" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "1 +* 2";   # invalid syntax → Meta.parseall returns an :error node
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+    )
+    @test contains(result.md, "#> ERROR:")
+    @test !contains(result.md, "Expr(:error")   # no raw Expr repr in output
+end
+
+@testitem "error shown as #> ERROR:" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        """error("something went wrong")""";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+    )
+    @test contains(result.md, "#> ERROR:")
+    @test contains(result.md, "something went wrong")
+end
+
+@testitem "error stops execution of subsequent expressions" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "error(\"oops\")\n1 + 1";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+    )
+    @test contains(result.md, "#> ERROR:")
+    @test !contains(result.md, "#> 2")
+end
+
 # ── mwe() function form ───────────────────────────────────────────────────────
 
 @testitem "mwe() with explicit string" tags=[:unit, :fast] begin
@@ -232,6 +273,19 @@ end
 end
 
 # ── newprocess=true (subprocess) ──────────────────────────────────────────────
+
+@testitem "newprocess=true: error shown as #> ERROR:" tags=[:integration, :slow] begin
+    result = MinimalWorkingExamples._run_mwe(
+        """error("subprocess error")""";
+        temp = false,
+        newprocess = true,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+    )
+    @test contains(result.md, "#> ERROR:")
+    @test contains(result.md, "subprocess error")
+end
 
 @testitem "newprocess=true: basic output" tags=[:integration, :slow] begin
     result = MinimalWorkingExamples._run_mwe(
