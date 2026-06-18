@@ -570,9 +570,6 @@ function _run_mwe(
 
     lang = venue === :gh ? "julia" : ""
     md = "```$lang\n$repl_output\n```"
-    if manifest && !isempty(manifest_str)
-        md *= "\n\n<details>\n<summary>Manifest.toml</summary>\n\n```toml\n$manifest_str\n```\n\n</details>"
-    end
     if _advertise
         notes = String[]
         !newprocess && push!(notes, "in-process")
@@ -583,6 +580,9 @@ function _run_mwe(
         end
         extra = isempty(notes) ? "" : " · " * join(notes, " · ")
         md *= "\n\n<sup>Created on $(today()) with [MinimalWorkingExamples v$(pkgversion(MinimalWorkingExamples))](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia $VERSION$extra</sup>"
+    end
+    if manifest && !isempty(manifest_str)
+        md *= "\n\n<details>\n<summary>Manifest.toml</summary>\n\n```toml\n$manifest_str\n```\n\n</details>"
     end
 
     try
