@@ -24,10 +24,8 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
 - `manifest=false`: append the `Manifest.toml` in a collapsible `<details>` block
 - `advertise`: append a footer noting the date, this package, and Julia version used.
   Defaults to `true` for `:gh` and `false` for `:slack`; can be set explicitly to override.
-- `packagespecs=PackageSpec[]`: vector of `Pkg.PackageSpec`s for packages that need a specific
-  version, git revision, URL, or local path — instead of the latest registered version.
-  Useful for creating MWEs of unmerged PRs or pre-release fixes. Any package named here
-  overrides the auto-detected version from `using`/`import`.
+- `packagespecs=PackageSpec[]`: vector of [`Pkg.PackageSpec`](https://pkgdocs.julialang.org/v1/api/#Pkg.PackageSpec)s for packages that need a specific
+  version, git revision, URL, or local path.
 - `manifest_path=nothing`: path to an existing `Manifest.toml` to use as-is. When set,
   `Pkg.add` is skipped entirely and `Pkg.instantiate()` reproduces the exact environment.
   Mutually exclusive with `packagespecs`.
