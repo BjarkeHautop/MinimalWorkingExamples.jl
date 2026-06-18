@@ -4,7 +4,7 @@ CurrentModule = MinimalWorkingExamples
 
 # MinimalWorkingExamples.jl
 
-Turn a snippet of Julia code into a shareable, self-contained Markdown block — ready to paste into a GitHub issue, Discourse post, or Slack message. Inspired by the R package [reprex](https://reprex.tidyverse.org/).
+Turn a snippet of Julia code into a shareable, self-contained Markdown block for pasting into a GitHub issue, Discourse post, or Slack message.
 
 ## Installation
 
@@ -42,7 +42,7 @@ mean(x)
 <sup>Created on <date> with [MinimalWorkingExamples v<pkg-version>](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia <version></sup>
 ````
 
-The value of the last expression is shown as `#>`, as are any `print`/`println` calls and log messages (`@warn`, `@info`) in the code.
+The value of the last expression is shown as `#>`, as are any `print` calls and log messages (`@warn`, `@info`) in the code.
 
 The result is returned as a [`MWEResult`](@ref), so you can access the Markdown string directly if the clipboard is unavailable:
 
