@@ -1,5 +1,6 @@
 module MinimalWorkingExamples
 
+using Dates: today
 using Pkg
 using InteractiveUtils: clipboard
 
@@ -8,17 +9,18 @@ export @mwe, MWEResult
 """
     @mwe begin
         code
-    end [temp=true] [newprocess=true] [manifest=true] [packagespecs=PackageSpec[]]
+    end [temp=true] [newprocess=true] [manifest=false] [advertise=true] [packagespecs=PackageSpec[]]
 
-Generate a Minimal Working Example (MWE) formatted as a Julia REPL session in Markdown.
+Generate a Minimal Working Example (MWE) formatted as Markdown, then copy it to the clipboard.
 
-Executes `code` and formats the output as a Markdown fenced code block with REPL-style
-`julia>` prompts, then copies the result to the clipboard.
+The code is rendered as a copy-pasteable Julia script with the output of the final expression
+(and any `print`/`println` calls) shown as `#>` comments — the same format as R's reprex package.
 
 # Keyword arguments
 - `temp=true`: run in a temporary environment; packages from `using`/`import` are auto-added
 - `newprocess=true`: run the MWE in a fresh Julia process for reproducibility
-- `manifest=true`: append the `Manifest.toml` in a collapsible `<details>` block
+- `manifest=false`: append the `Manifest.toml` in a collapsible `<details>` block
+- `advertise=true`: append a footer noting the date and Julia version used
 - `packagespecs=PackageSpec[]`: additional `PackageSpec`s (useful for specific versions, PRs, URLs)
 
 # Examples
@@ -28,6 +30,15 @@ Executes `code` and formats the output as a Markdown fenced code block with REPL
     x = [1, 2, 3, 4, 5]
     mean(x)
 end
+```
+
+Produces (copied to clipboard):
+
+```julia
+using Statistics
+x = [1, 2, 3, 4, 5]
+mean(x)
+#> 3.0
 ```
 """
 macro mwe(ex, kwargs...)
@@ -45,19 +56,20 @@ macro mwe(ex, kwargs...)
             $code_str;
             temp = $(get(kw, :temp, true)),
             newprocess = $(get(kw, :newprocess, true)),
-            manifest = $(get(kw, :manifest, true)),
+            manifest = $(get(kw, :manifest, false)),
+            advertise = $(get(kw, :advertise, true)),
             packagespecs = $(get(kw, :packagespecs, :(Pkg.PackageSpec[]))),
         )
     end
 end
 
-# ── Result type ───────────────────────────────────────────────────────────────
+# ── Result type ────────────────────────────────────────────────────────────────
 
 """
     MWEResult
 
 Wraps the Markdown string produced by `@mwe`. Displays silently in the REPL
-(the formatted output is printed directly); access the raw string via `.md`.
+(the formatted output is already printed directly); access the raw string via `.md`.
 """
 struct MWEResult
     md::String
@@ -141,23 +153,37 @@ end
 
 function _build_driver_script(code_str::AbstractString)
     return """
-    function _mwe_show(val)
-        val === nothing && return
-        show(IOContext(stdout, :limit => true, :color => false), MIME"text/plain"(), val)
-        println()
+    function _mwe_prefix_output(str)
+        isempty(str) && return
+        for line in split(rstrip(str, '\\n'), '\\n')
+            println("#> ", line)
+        end
     end
 
     const _mwe_code = $(repr(code_str))
-    for _mwe_node in Meta.parseall(_mwe_code).args
-        _mwe_node isa LineNumberNode && continue
-        _mwe_ex    = Base.remove_linenums!(deepcopy(_mwe_node))
-        _mwe_str   = string(_mwe_ex)
-        _mwe_lines = split(_mwe_str, '\\n')
-        print("julia> ", _mwe_lines[1], "\\n")
-        for _mwe_line in _mwe_lines[2:end]
-            print("       ", _mwe_line, "\\n")
+    const _mwe_nodes = [n for n in Meta.parseall(_mwe_code).args if !(n isa LineNumberNode)]
+    for (i, _mwe_node) in enumerate(_mwe_nodes)
+        _mwe_ex = Base.remove_linenums!(deepcopy(_mwe_node))
+        println(string(_mwe_ex))
+
+        _mwe_original = Base.stdout
+        _mwe_rd, _mwe_wr = redirect_stdout()
+        local _mwe_val
+        try
+            _mwe_val = Base.invokelatest(Core.eval, Main, _mwe_node)
+        finally
+            redirect_stdout(_mwe_original)
+            close(_mwe_wr)
         end
-        _mwe_show(Base.invokelatest(Core.eval, Main, _mwe_node))
+        _mwe_captured = read(_mwe_rd, String)
+        close(_mwe_rd)
+
+        _mwe_prefix_output(_mwe_captured)
+        if i == length(_mwe_nodes) && _mwe_val !== nothing
+            _mwe_buf = IOBuffer()
+            show(IOContext(_mwe_buf, :limit => true, :color => false), MIME"text/plain"(), _mwe_val)
+            _mwe_prefix_output(String(take!(_mwe_buf)))
+        end
     end
     """
 end
@@ -232,22 +258,30 @@ function _capture_eval(ex::Expr)
     return val, captured
 end
 
+function _prefix_lines(io::IO, str::AbstractString, prefix::AbstractString)
+    isempty(str) && return
+    for line in split(rstrip(str, '\n'), '\n')
+        println(io, prefix, line)
+    end
+end
+
 function _run_in_current_process(code_str::AbstractString)
     buf = IOBuffer()
-    for node in Meta.parseall(code_str).args
-        node isa LineNumberNode && continue
-        node isa Expr || continue
+    nodes =
+        [n for n in Meta.parseall(code_str).args if !(n isa LineNumberNode) && n isa Expr]
+    for (i, node) in enumerate(nodes)
         ex_str = string(Base.remove_linenums!(deepcopy(node)))
-        lines = split(ex_str, '\n')
-        print(buf, "julia> ", lines[1], "\n")
-        for line in lines[2:end]
-            print(buf, "       ", line, "\n")
-        end
         val, captured = _capture_eval(node)
-        print(buf, captured)
-        if val !== nothing
-            show(IOContext(buf, :limit => true, :color => false), MIME"text/plain"(), val)
-            println(buf)
+        println(buf, ex_str)
+        _prefix_lines(buf, captured, "#> ")
+        if i == length(nodes) && val !== nothing
+            val_buf = IOBuffer()
+            show(
+                IOContext(val_buf, :limit => true, :color => false),
+                MIME"text/plain"(),
+                val,
+            )
+            _prefix_lines(buf, String(take!(val_buf)), "#> ")
         end
     end
     return String(take!(buf)), ""
@@ -259,7 +293,8 @@ function _run_mwe(
     code_str::AbstractString;
     temp::Bool = true,
     newprocess::Bool = true,
-    manifest::Bool = true,
+    manifest::Bool = false,
+    advertise::Bool = true,
     packagespecs::Vector = Pkg.PackageSpec[],
 )
     repl_output, manifest_str = if newprocess
@@ -271,6 +306,9 @@ function _run_mwe(
     md = "```julia\n$repl_output\n```"
     if manifest && !isempty(manifest_str)
         md *= "\n\n<details>\n<summary>Manifest.toml</summary>\n\n```toml\n$manifest_str\n```\n\n</details>"
+    end
+    if advertise
+        md *= "\n\n<sup>Created on $(today()) with [MinimalWorkingExamples.jl](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia $VERSION</sup>"
     end
 
     try
