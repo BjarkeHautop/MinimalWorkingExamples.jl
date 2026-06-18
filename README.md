@@ -48,7 +48,7 @@ mean(x)
 
 The value of the last expression is shown as `#>`, as are any `print`/`println` calls anywhere in the code.
 
-`mwe()` is the function version of the macro. If the first argument is not given code from the clipboard is passed:
+`mwe()` is the function version of the macro. If the first argument is not given, code is read from the clipboard.
 
 ## Including environment details
 

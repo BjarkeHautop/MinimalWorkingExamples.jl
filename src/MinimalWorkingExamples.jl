@@ -9,7 +9,7 @@ export @mwe, mwe, MWEResult
 """
     @mwe begin
         code
-    end [temp=true] [newprocess=true] [manifest=false] [advertise=true] [packagespecs=PackageSpec[]] [manifest_path=nothing]
+    end [venue=:gh] [temp=true] [newprocess=true] [manifest=false] [advertise=nothing] [packagespecs=PackageSpec[]] [manifest_path=nothing]
 
 Generate a Minimal Working Example (MWE) formatted as Markdown, then copy it to the clipboard.
 
@@ -19,8 +19,11 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
 # Keyword arguments
 - `temp=true`: run in a temporary environment; packages from `using`/`import` are auto-added
 - `newprocess=true`: run the MWE in a fresh Julia process for reproducibility
+- `venue=:gh`: output format — `:gh` for GitHub-Flavored Markdown (default), `:slack` for Slack
+  (strips the language identifier from the code fence)
 - `manifest=false`: append the `Manifest.toml` in a collapsible `<details>` block
-- `advertise=true`: append a footer noting the date, this package, and Julia version used
+- `advertise`: append a footer noting the date, this package, and Julia version used.
+  Defaults to `true` for `:gh` and `false` for `:slack`; can be set explicitly to override.
 - `packagespecs=PackageSpec[]`: vector of `Pkg.PackageSpec`s for packages that need a specific
   version, git revision, URL, or local path — instead of the latest registered version.
   Useful for creating MWEs of unmerged PRs or pre-release fixes. Any package named here
@@ -85,10 +88,11 @@ macro mwe(ex, kwargs...)
     return quote
         MinimalWorkingExamples._run_mwe(
             $code_str;
+            venue = $(get(kw, :venue, :(:gh))),
             temp = $(get(kw, :temp, true)),
             newprocess = $(get(kw, :newprocess, true)),
             manifest = $(get(kw, :manifest, false)),
-            advertise = $(get(kw, :advertise, true)),
+            advertise = $(get(kw, :advertise, nothing)),
             packagespecs = $(get(kw, :packagespecs, :(Pkg.PackageSpec[]))),
             manifest_path = $(get(kw, :manifest_path, nothing)),
         )
@@ -96,7 +100,7 @@ macro mwe(ex, kwargs...)
 end
 
 """
-    mwe([code]; temp=true, newprocess=true, manifest=false, advertise=true,
+    mwe([code]; venue=:gh, temp=true, newprocess=true, manifest=false, advertise=nothing,
                packagespecs=PackageSpec[], manifest_path=nothing)
 
 Function form of [`@mwe`](@ref). Accepts code as a plain string.
@@ -108,6 +112,9 @@ If `code` is omitted, reads Julia source from the clipboard.
 # Run code already copied to the clipboard:
 mwe()
 
+# Format for Slack:
+mwe(venue=:slack)
+
 # Run an explicit string:
 mwe(\"""
 using Statistics
@@ -117,14 +124,24 @@ mean([1, 2, 3])
 """
 function mwe(
     code::AbstractString = clipboard();
+    venue::Symbol = :gh,
     temp::Bool = true,
     newprocess::Bool = true,
     manifest::Bool = false,
-    advertise::Bool = true,
+    advertise::Union{Bool,Nothing} = nothing,
     packagespecs::Vector = Pkg.PackageSpec[],
     manifest_path::Union{AbstractString,Nothing} = nothing,
 )
-    _run_mwe(code; temp, newprocess, manifest, advertise, packagespecs, manifest_path)
+    _run_mwe(
+        code;
+        venue,
+        temp,
+        newprocess,
+        manifest,
+        advertise,
+        packagespecs,
+        manifest_path,
+    )
 end
 
 # ── Result type ────────────────────────────────────────────────────────────────
@@ -416,24 +433,29 @@ end
 
 function _run_mwe(
     code_str::AbstractString;
+    venue::Symbol = :gh,
     temp::Bool = true,
     newprocess::Bool = true,
     manifest::Bool = false,
-    advertise::Bool = true,
+    advertise::Union{Bool,Nothing} = nothing,
     packagespecs::Vector = Pkg.PackageSpec[],
     manifest_path::Union{AbstractString,Nothing} = nothing,
 )
+    venue in (:gh, :slack) || error("venue must be :gh or :slack, got $(repr(venue))")
+    _advertise = isnothing(advertise) ? (venue === :gh) : advertise
+
     repl_output, manifest_str = if newprocess
         _run_in_new_process(code_str; temp, manifest, packagespecs, manifest_path)
     else
         _run_in_current_process(code_str)
     end
 
-    md = "```julia\n$repl_output\n```"
+    lang = venue === :gh ? "julia" : ""
+    md = "```$lang\n$repl_output\n```"
     if manifest && !isempty(manifest_str)
         md *= "\n\n<details>\n<summary>Manifest.toml</summary>\n\n```toml\n$manifest_str\n```\n\n</details>"
     end
-    if advertise
+    if _advertise
         notes = String[]
         !newprocess && push!(notes, "in-process")
         if !isnothing(manifest_path)
