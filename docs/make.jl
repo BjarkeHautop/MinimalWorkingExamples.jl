@@ -69,6 +69,7 @@ makedocs(;
     format = Documenter.HTML(;
         canonical = "https://BjarkeHautop.github.io/MinimalWorkingExamples.jl",
         assets = ["assets/gh-output.css"],
+        repolink = "https://github.com/BjarkeHautop/MinimalWorkingExamples.jl",
     ),
     pages = list_pages(),
 )
