@@ -1,4 +1,5 @@
 [deps]
+# Logging+Statistics must be listed explicitly so the MWE subprocess driver on CI still works
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 MinimalWorkingExamples = "1cd72250-7741-5363-ad87-1e7986b7dfb4"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
