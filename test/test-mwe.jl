@@ -195,3 +195,24 @@ end
     @test contains(result.md, "Hello, World")
     @test contains(result.md, "0.5.3")   # pinned version appears in Manifest
 end
+
+@testitem "@mwe: manifest_path reproduces exact environment" tags=[:integration, :slow] begin
+    using Pkg
+    # Build a reference environment with Example 0.5.3 to get a known Manifest.toml
+    ref_dir = mktempdir()
+    try
+        Pkg.activate(ref_dir; io = devnull)
+        Pkg.add(PackageSpec(name = "Example", version = "0.5.3"); io = devnull)
+        manifest_file = joinpath(ref_dir, "Manifest.toml")
+        result = @mwe begin
+            using Example
+            Example.hello("World")
+        end temp=true newprocess=true manifest=true advertise=false manifest_path=manifest_file
+        @test result isa MWEResult
+        @test contains(result.md, "Hello, World")
+        @test contains(result.md, "0.5.3")   # exact version from the manifest
+    finally
+        Pkg.activate(; io = devnull)   # restore default env
+        rm(ref_dir; recursive = true)
+    end
+end

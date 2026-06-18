@@ -9,7 +9,7 @@ export @mwe, MWEResult
 """
     @mwe begin
         code
-    end [temp=true] [newprocess=true] [manifest=false] [advertise=true] [packagespecs=PackageSpec[]]
+    end [temp=true] [newprocess=true] [manifest=false] [advertise=true] [packagespecs=PackageSpec[]] [manifest_path=nothing]
 
 Generate a Minimal Working Example (MWE) formatted as Markdown, then copy it to the clipboard.
 
@@ -25,6 +25,10 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
   version, git revision, URL, or local path — instead of the latest registered version.
   Useful for creating MWEs of unmerged PRs or pre-release fixes. Any package named here
   overrides the auto-detected version from `using`/`import`.
+- `manifest_path=nothing`: path to an existing `Manifest.toml` to use as-is. When set,
+  `Pkg.add` is skipped entirely and `Pkg.instantiate()` reproduces the exact environment.
+  A `Project.toml` in the same directory is copied alongside it if present.
+  Mutually exclusive with `packagespecs`.
 
 # Examples
 
@@ -75,7 +79,7 @@ macro mwe(ex, kwargs...)
     kw = Dict{Symbol,Any}()
     for kwarg in kwargs
         if kwarg isa Expr && kwarg.head == :(=)
-            kw[kwarg.args[1]] = kwarg.args[2]
+            kw[kwarg.args[1]] = esc(kwarg.args[2])
         end
     end
 
@@ -87,6 +91,7 @@ macro mwe(ex, kwargs...)
             manifest = $(get(kw, :manifest, false)),
             advertise = $(get(kw, :advertise, true)),
             packagespecs = $(get(kw, :packagespecs, :(Pkg.PackageSpec[]))),
+            manifest_path = $(get(kw, :manifest_path, nothing)),
         )
     end
 end
@@ -186,6 +191,46 @@ function _repr_packagespec(spec::Pkg.PackageSpec)
     return "Pkg.PackageSpec($(join(parts, ", ")))"
 end
 
+function _describe_packagespec(spec::Pkg.PackageSpec)
+    _get(f) =
+        try
+            f()
+        catch
+            ;
+            nothing
+        end
+
+    name = let n = _get(() -> spec.name);
+        (!isnothing(n) && !isempty(n)) ? n : "?"
+    end
+
+    v = _get(() -> spec.version)
+    v_str = if !isnothing(v)
+        s = string(v);
+        (isempty(s) || s == "*") ? nothing : s
+    end
+
+    url = _get(() -> spec.repo.source)
+    isnothing(url) && (url = _get(() -> spec.url))
+
+    rev = _get(() -> spec.repo.rev)
+    isnothing(rev) && (rev = _get(() -> spec.rev))
+
+    path = _get(() -> spec.path)
+
+    if !isnothing(v_str)
+        "$name@$v_str"
+    elseif !isnothing(rev)
+        "$name#$rev"
+    elseif !isnothing(url)
+        "$name (url)"
+    elseif !isnothing(path) && !isempty(path)
+        "$name (local)"
+    else
+        name
+    end
+end
+
 # ── Driver script ──────────────────────────────────────────────────────────────
 
 function _build_driver_script(code_str::AbstractString)
@@ -231,20 +276,30 @@ function _setup_temp_env!(
     tmpdir::AbstractString,
     code_str::AbstractString,
     packagespecs::Vector,
+    manifest_path::Union{AbstractString,Nothing} = nothing,
 )
-    packages = _extract_packages(code_str)
+    if !isnothing(manifest_path)
+        cp(manifest_path, joinpath(tmpdir, "Manifest.toml"))
+        project_toml = joinpath(dirname(abspath(manifest_path)), "Project.toml")
+        isfile(project_toml) && cp(project_toml, joinpath(tmpdir, "Project.toml"))
+        setup_script = "using Pkg\nPkg.instantiate()\n"
+    else
+        packages = _extract_packages(code_str)
 
-    spec_names = Set(s.name for s in packagespecs if !isnothing(s.name) && !isempty(s.name))
-    packages = filter(p -> p ∉ spec_names, packages)
+        spec_names =
+            Set(s.name for s in packagespecs if !isnothing(s.name) && !isempty(s.name))
+        packages = filter(p -> p ∉ spec_names, packages)
 
-    add_stmts = String[]
-    isempty(packages) || push!(add_stmts, "Pkg.add([$(join(repr.(packages), ", "))])")
-    for spec in packagespecs
-        push!(add_stmts, "Pkg.add($(_repr_packagespec(spec)))")
+        add_stmts = String[]
+        isempty(packages) || push!(add_stmts, "Pkg.add([$(join(repr.(packages), ", "))])")
+        for spec in packagespecs
+            push!(add_stmts, "Pkg.add($(_repr_packagespec(spec)))")
+        end
+        push!(add_stmts, "Pkg.instantiate()")
+
+        setup_script = "using Pkg\n$(join(add_stmts, "\n"))\n"
     end
-    push!(add_stmts, "Pkg.instantiate()")
 
-    setup_script = "using Pkg\n$(join(add_stmts, "\n"))\n"
     julia_exe = joinpath(Sys.BINDIR, Base.julia_exename())
     run(`$julia_exe --project=$tmpdir --startup-file=no -e $setup_script`)
 end
@@ -256,9 +311,10 @@ function _run_in_new_process(
     temp::Bool = true,
     manifest::Bool = true,
     packagespecs::Vector = Pkg.PackageSpec[],
+    manifest_path::Union{AbstractString,Nothing} = nothing,
 )
     mktempdir() do tmpdir
-        temp && _setup_temp_env!(tmpdir, code_str, packagespecs)
+        temp && _setup_temp_env!(tmpdir, code_str, packagespecs, manifest_path)
 
         script_path = joinpath(tmpdir, "mwe_driver.jl")
         write(script_path, _build_driver_script(code_str))
@@ -336,9 +392,10 @@ function _run_mwe(
     manifest::Bool = false,
     advertise::Bool = true,
     packagespecs::Vector = Pkg.PackageSpec[],
+    manifest_path::Union{AbstractString,Nothing} = nothing,
 )
     repl_output, manifest_str = if newprocess
-        _run_in_new_process(code_str; temp, manifest, packagespecs)
+        _run_in_new_process(code_str; temp, manifest, packagespecs, manifest_path)
     else
         _run_in_current_process(code_str)
     end
@@ -348,7 +405,15 @@ function _run_mwe(
         md *= "\n\n<details>\n<summary>Manifest.toml</summary>\n\n```toml\n$manifest_str\n```\n\n</details>"
     end
     if advertise
-        md *= "\n\n<sup>Created on $(today()) with [MinimalWorkingExamples.jl](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia $VERSION</sup>"
+        notes = String[]
+        !newprocess && push!(notes, "in-process")
+        if !isnothing(manifest_path)
+            push!(notes, "from existing Manifest.toml")
+        elseif !isempty(packagespecs)
+            push!(notes, "pinned: " * join(_describe_packagespec.(packagespecs), ", "))
+        end
+        extra = isempty(notes) ? "" : " · " * join(notes, " · ")
+        md *= "\n\n<sup>Created on $(today()) with [MinimalWorkingExamples.jl](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia $VERSION$extra</sup>"
     end
 
     try
