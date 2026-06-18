@@ -4,7 +4,7 @@ using Dates: today
 using Pkg
 using InteractiveUtils: clipboard
 
-export @mwe, MWEResult
+export @mwe, mwe, MWEResult
 
 """
     @mwe begin
@@ -94,6 +94,38 @@ macro mwe(ex, kwargs...)
             manifest_path = $(get(kw, :manifest_path, nothing)),
         )
     end
+end
+
+"""
+    mwe([code]; temp=true, newprocess=true, manifest=false, advertise=true,
+               packagespecs=PackageSpec[], manifest_path=nothing)
+
+Function form of [`@mwe`](@ref). Accepts code as a plain string.
+If `code` is omitted, reads Julia source from the clipboard.
+
+# Examples
+
+```julia
+# Run code already copied to the clipboard:
+mwe()
+
+# Run an explicit string:
+mwe(\"""
+using Statistics
+mean([1, 2, 3])
+\""")
+```
+"""
+function mwe(
+    code::AbstractString = clipboard();
+    temp::Bool = true,
+    newprocess::Bool = true,
+    manifest::Bool = false,
+    advertise::Bool = true,
+    packagespecs::Vector = Pkg.PackageSpec[],
+    manifest_path::Union{AbstractString,Nothing} = nothing,
+)
+    _run_mwe(code; temp, newprocess, manifest, advertise, packagespecs, manifest_path)
 end
 
 # ── Result type ────────────────────────────────────────────────────────────────
