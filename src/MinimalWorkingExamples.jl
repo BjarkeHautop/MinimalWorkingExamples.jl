@@ -152,8 +152,6 @@ function mwe(
     )
 end
 
-# ── Result type ────────────────────────────────────────────────────────────────
-
 """
     MWEResult
 
@@ -390,6 +388,8 @@ function _setup_temp_env!(
     manifest_path::Union{AbstractString,Nothing} = nothing;
     verbose::Bool = false,
 )
+    install_names = String[]
+
     if !isnothing(manifest_path)
         cp(manifest_path, joinpath(tmpdir, "Manifest.toml"))
         setup_script = "using Pkg\nPkg.instantiate()\n"
@@ -399,6 +399,12 @@ function _setup_temp_env!(
         spec_names =
             Set(s.name for s in packagespecs if !isnothing(s.name) && !isempty(s.name))
         packages = filter(p -> p ∉ spec_names, packages)
+
+        append!(install_names, packages)
+        append!(
+            install_names,
+            [s.name for s in packagespecs if !isnothing(s.name) && !isempty(s.name)],
+        )
 
         add_stmts = String[]
         isempty(packages) || push!(add_stmts, "Pkg.add([$(join(repr.(packages), ", "))])")
@@ -415,7 +421,13 @@ function _setup_temp_env!(
         `$julia_exe --project=$tmpdir --startup-file=no -e $setup_script`,
         "JULIA_LOAD_PATH" => join(["@", "@stdlib"], Sys.iswindows() ? ";" : ":"),
     )
+    if isempty(install_names)
+        @info "Instantiating environment..."
+    else
+        @info "Installing packages: $(join(install_names, ", "))..."
+    end
     verbose ? run(cmd) : run(pipeline(cmd; stdout = devnull, stderr = devnull))
+    @info "Running code..."
 end
 
 # ── Execution backends ─────────────────────────────────────────────────────────
