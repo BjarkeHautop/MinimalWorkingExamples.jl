@@ -9,7 +9,7 @@ MinimalWorkingExamples.jl takes care of running the code and generating Markdown
 
 Strip away everything that isn't needed to trigger the behaviour.
 
-- Remove unrelated code, packages, and options. If deleting a line doesn't make the problem go away, it doesn't belong in the MWE.
+- Only keep code that is necessary to reproduce the problem. If removing a line changes nothing, remove it.
 - Shrink the data. A bug that shows up on a 10,000-row table could probably be reduced to 10 rows.
 - Use built-in or generated data (`rand`, `1:5`) instead of files on your disk.
 

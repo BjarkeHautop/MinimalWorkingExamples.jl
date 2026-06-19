@@ -108,8 +108,7 @@ end
 
 """
     mwe([code]; venue=:gh, temp=true, newprocess=true, manifest=false, advertise=nothing,
-               packagespecs=PackageSpec[], manifest_path=nothing, verbose=false, stacktrace=false,
-               quiet=false)
+               packagespecs=PackageSpec[], manifest_path=nothing, verbose=false, stacktrace=false)
 
 Function form of [`@mwe`](@ref). Accepts code as a plain string.
 If `code` is omitted, reads Julia source from the clipboard.
@@ -684,6 +683,7 @@ function _run_mwe(
     if _advertise
         notes = String[]
         !newprocess && push!(notes, "in-process")
+        !temp && push!(notes, "current environment")
         if !isnothing(manifest_path)
             push!(notes, "from existing Manifest.toml")
         elseif !isempty(packagespecs)

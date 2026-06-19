@@ -109,7 +109,7 @@ using Pkg
 end packagespecs=[PackageSpec(name="Example", version="0.5.3")]
 ```
 
-Pinned packages are noted in the footer: `· pinned: Example@0.5.3`.
+Pinned packages are noted in the footer: `· pinned: Example v0.5.3`.
 
 ## Reproducing an exact environment
 
@@ -122,7 +122,7 @@ Pass `manifest_path` to use an existing `Manifest.toml` as-is.
 end manifest_path="/path/to/your/Manifest.toml"
 ```
 
-## To Do
+## To do
 
 - Allow the user to set different defaults using Preferences.jl?
 

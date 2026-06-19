@@ -189,7 +189,7 @@ Example.hello("World")
 ```
 
 ```@raw html
-<small>Created on <date> with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v<version></a> using Julia <julia-version> · pinned: Example@0.5.3</small>
+<small>Created on <date> with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v<version></a> using Julia <julia-version> · pinned: Example v0.5.3</small>
 </div>
 ```
 
