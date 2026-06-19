@@ -339,20 +339,28 @@ function _build_driver_script(code_str::AbstractString; stacktrace::Bool = false
         end
     end
 
-    function _mwe_to_display_string(ex)
-        ex isa Expr || return string(ex)
-        s = string(Base.remove_linenums!(deepcopy(ex)))
-        return replace(s, r"#= [^\\n=]*:\\d+ =# ?" => "")
+    const _mwe_code = $(repr(code_str))
+    const _mwe_src_lines = split(_mwe_code, '\\n')
+
+    # Pair each expression with its start line from LineNumberNodes
+    _mwe_items = Tuple{Int,Any}[]
+    let _cur_line = 1
+        for _n in Meta.parseall(_mwe_code).args
+            if _n isa LineNumberNode
+                _cur_line = _n.line
+            else
+                push!(_mwe_items, (_cur_line, _n))
+            end
+        end
     end
 
-    const _mwe_code = $(repr(code_str))
-    const _mwe_nodes = [n for n in Meta.parseall(_mwe_code).args if !(n isa LineNumberNode)]
-    for (i, _mwe_node) in enumerate(_mwe_nodes)
+    for (i, (_mwe_start, _mwe_node)) in enumerate(_mwe_items)
         if _mwe_node isa Expr && _mwe_node.head === :error
             _mwe_prefix_output("ERROR: " * sprint(showerror, _mwe_node.args[1]))
             break
         end
-        println(_mwe_to_display_string(_mwe_node))
+        _mwe_end = i < length(_mwe_items) ? _mwe_items[i + 1][1] - 1 : length(_mwe_src_lines)
+        println(rstrip(join(_mwe_src_lines[_mwe_start:_mwe_end], '\\n')))
 
         _mwe_original_out = Base.stdout
         _mwe_original_err = Base.stderr
@@ -397,7 +405,7 @@ function _build_driver_script(code_str::AbstractString; stacktrace::Bool = false
             _mwe_prefix_output("ERROR: " * _mwe_err_str)
             break
         end
-        if i == length(_mwe_nodes) && _mwe_val !== nothing
+        if i == length(_mwe_items) && _mwe_val !== nothing
             _mwe_buf = IOBuffer()
             show(IOContext(_mwe_buf, :limit => true, :color => false), MIME"text/plain"(), _mwe_val)
             _mwe_prefix_output(String(take!(_mwe_buf)))
@@ -552,13 +560,24 @@ function _execute_code_in_current_process(
     stacktrace::Bool = false,
 )
     buf = IOBuffer()
-    nodes = [n for n in Meta.parseall(code_str).args if !(n isa LineNumberNode)]
-    for (i, node) in enumerate(nodes)
+    src_lines = split(code_str, '\n')
+    items = Tuple{Int,Any}[]
+    let cur_line = 1
+        for n in Meta.parseall(code_str).args
+            if n isa LineNumberNode
+                cur_line = n.line
+            else
+                push!(items, (cur_line, n))
+            end
+        end
+    end
+    for (i, (start_line, node)) in enumerate(items)
         if node isa Expr && node.head === :error
             _prefix_lines(buf, "ERROR: " * sprint(showerror, node.args[1]), "#> ")
             break
         end
-        ex_str = _expr_to_display_string(node)
+        end_line = i < length(items) ? items[i+1][1] - 1 : length(src_lines)
+        ex_str = rstrip(join(src_lines[start_line:end_line], '\n'))
         val, captured_out, captured_err, err, bt = _capture_eval(node)
         println(buf, ex_str)
         _prefix_lines(buf, captured_out, "#> ")
@@ -567,7 +586,7 @@ function _execute_code_in_current_process(
             _prefix_lines(buf, "ERROR: " * _format_error(err, bt; stacktrace), "#> ")
             break
         end
-        if i == length(nodes) && val !== nothing
+        if i == length(items) && val !== nothing
             val_buf = IOBuffer()
             show(
                 IOContext(val_buf, :limit => true, :color => false),
@@ -577,7 +596,7 @@ function _execute_code_in_current_process(
             _prefix_lines(buf, String(take!(val_buf)), "#> ")
         end
     end
-    return String(take!(buf))
+    return rstrip(String(take!(buf)), '\n')
 end
 
 function _run_in_current_process(

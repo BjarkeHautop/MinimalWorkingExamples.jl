@@ -297,7 +297,7 @@ end
 @testitem "@warn in function body: no #= ... =# in output" tags=[:unit, :fast] begin
     code = """
     function my_warn_function()
-        @warn("This is a warning")
+        @warn "This is a warning"
     end
     my_warn_function()
     1 + 1
@@ -375,6 +375,24 @@ end
     @test result isa MWEResult
     @test contains(result.md, "x = 7")
     @test contains(result.md, "#> 21")
+end
+
+@testitem "mwe() with comments are preserved" tags=[:unit, :fast] begin
+    result = mwe("x = 7 # Set x to 7\nx * 3 # Multiply x by 3"; advertise = false)
+    @test result isa MWEResult
+    @test contains(result.md, "x = 7")
+    @test contains(result.md, "Set x to 7")
+    @test contains(result.md, "x * 3")
+    @test contains(result.md, "Multiply x by 3")
+    @test contains(result.md, "#> 21")
+
+    result_same_process = mwe(
+        "x = 7 # Set x to 7\nx * 3 # Multiply x by 3";
+        temp = false,
+        newprocess = false,
+        advertise = false,
+    )
+    @test result_same_process.md == result.md  # comments preserved in both cases
 end
 
 # ── _describe_packagespec ──────────────────────────────────────────────────────
