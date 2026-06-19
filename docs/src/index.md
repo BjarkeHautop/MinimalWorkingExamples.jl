@@ -45,7 +45,7 @@ mean(x)
 ```
 
 ```@raw html
-<small>Created on 2026-06-18 with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v0.1.0</a> using Julia 1.12.6</small>
+<small>Created on <date> with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v<version></a> using Julia <julia-version></small>
 </div>
 ```
 
@@ -112,7 +112,7 @@ x[10]
 ```
 
 ```@raw html
-<small>Created on 2026-06-18 with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v0.1.0</a> using Julia 1.12.6</small>
+<small>Created on <date> with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v<version></a> using Julia <julia-version></small>
 </div>
 ```
 
@@ -147,7 +147,7 @@ x[10]
 ```
 
 ```@raw html
-<small>Created on 2026-06-18 with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v0.1.0</a> using Julia 1.12.6</small>
+<small>Created on <date> with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v<version></a> using Julia <julia-version></small>
 </div>
 ```
 
@@ -189,7 +189,7 @@ Example.hello("World")
 ```
 
 ```@raw html
-<small>Created on 2026-06-18 with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v0.1.0</a> using Julia 1.12.6 · pinned: Example@0.5.3</small>
+<small>Created on <date> with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v<version></a> using Julia <julia-version> · pinned: Example@0.5.3</small>
 </div>
 ```
 

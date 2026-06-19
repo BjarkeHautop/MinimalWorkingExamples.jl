@@ -1,5 +1,6 @@
 using MinimalWorkingExamples
 using Documenter
+using Dates: today
 
 DocMeta.setdocmeta!(
     MinimalWorkingExamples,
@@ -7,6 +8,47 @@ DocMeta.setdocmeta!(
     :(using MinimalWorkingExamples);
     recursive = true,
 )
+
+function generate_footer_html(; pinned_note = "")
+    date = today()
+    version = pkgversion(MinimalWorkingExamples)
+    julia_version = VERSION
+    extra = isempty(pinned_note) ? "" : " · $pinned_note"
+    return """<small>Created on $date with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v$version</a> using Julia $julia_version$extra</small>"""
+end
+
+function postprocess_html()
+    build_dir = joinpath(@__DIR__, "build")
+
+    # Update all HTML files in the build directory
+    for (root, dirs, files) in walkdir(build_dir)
+        for file in files
+            if endswith(file, ".html")
+                html_path = joinpath(root, file)
+                content = read(html_path, String)
+
+                # Handle the pinned version case first (more specific)
+                footer_pinned =
+                    generate_footer_html(; pinned_note = "pinned: Example@0.5.3")
+                content = replace(
+                    content,
+                    r"<small>Created on <date> with <a href=\"https://github\.com/BjarkeHautop/MinimalWorkingExamples\.jl\">MinimalWorkingExamples v<version></a> using Julia <julia-version> · pinned: Example@0\.5\.3</small>" =>
+                        footer_pinned,
+                )
+
+                # Then handle the general case (no pinned note)
+                footer = generate_footer_html()
+                content = replace(
+                    content,
+                    r"<small>Created on <date> with <a href=\"https://github\.com/BjarkeHautop/MinimalWorkingExamples\.jl\">MinimalWorkingExamples v<version></a> using Julia <julia-version></small>" =>
+                        footer,
+                )
+
+                write(html_path, content)
+            end
+        end
+    end
+end
 
 # Add titles of sections and overrides page titles
 const titles =
@@ -73,5 +115,7 @@ makedocs(;
     ),
     pages = list_pages(),
 )
+
+postprocess_html()
 
 deploydocs(; repo = "github.com/BjarkeHautop/MinimalWorkingExamples.jl")
