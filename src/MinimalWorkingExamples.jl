@@ -21,15 +21,17 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
 # Keyword arguments
 - `venue=:gh`: output format — `:gh` for GitHub-Flavored Markdown (default), `:slack` for Slack
   (strips the language identifier from the code fence).
-- `temp=true`: run in a temporary environment; packages from `using`/`import` are auto-added.
-- `newprocess=true`: run the MWE in a fresh Julia process for reproducibility.
+- `temp=true`: create a temporary isolated environment and auto-add packages from `using`/`import`.
+  When `false`, code runs in the current environment without auto-adding packages (to avoid
+  polluting the user's project).
+- `newprocess=true`: run the MWE in a fresh Julia process for reproducibility. If `temp=true` and
+  `newprocess=false`, the temporary project is activated, code runs, and the original project state is restored afterward.
 - `manifest=false`: append the `Manifest.toml` in a collapsible `<details>` block.
 - `advertise`: append a footer noting the date, this package, and Julia version used.
   Defaults to `true` for `:gh` and `false` for `:slack`; can be set explicitly to override.
 - `packagespecs=PackageSpec[]`: vector of [`Pkg.PackageSpec`](https://pkgdocs.julialang.org/v1/api/#Pkg.PackageSpec)s for packages that need a specific
   version, git revision, URL, or local path.
-- `manifest_path=nothing`: path to an existing `Manifest.toml` to use as-is. When set,
-  `Pkg.add` is skipped entirely and `Pkg.instantiate()` reproduces the exact environment.
+- `manifest_path=nothing`: path to an existing `Manifest.toml` to use as-is.
   Mutually exclusive with `packagespecs`.
 - `verbose=false`: if `true`, show Pkg output (downloads, resolver messages) during environment
   setup.
@@ -504,7 +506,10 @@ function _format_error(err, bt; stacktrace::Bool = false)
     return sprint(showerror, err) * st
 end
 
-function _run_in_current_process(code_str::AbstractString; stacktrace::Bool = false)
+function _execute_code_in_current_process(
+    code_str::AbstractString;
+    stacktrace::Bool = false,
+)
     buf = IOBuffer()
     nodes = [n for n in Meta.parseall(code_str).args if !(n isa LineNumberNode)]
     for (i, node) in enumerate(nodes)
@@ -531,7 +536,37 @@ function _run_in_current_process(code_str::AbstractString; stacktrace::Bool = fa
             _prefix_lines(buf, String(take!(val_buf)), "#> ")
         end
     end
-    return String(take!(buf)), ""
+    return String(take!(buf))
+end
+
+function _run_in_current_process(
+    code_str::AbstractString;
+    temp::Bool = false,
+    packagespecs::Vector = Pkg.PackageSpec[],
+    manifest_path::Union{AbstractString,Nothing} = nothing,
+    verbose::Bool = false,
+    stacktrace::Bool = false,
+)
+    if temp
+        mktempdir() do tmpdir
+            _setup_temp_env!(tmpdir, code_str, packagespecs, manifest_path; verbose)
+            original_project = Base.active_project()
+            try
+                Pkg.activate(tmpdir)
+                output = _execute_code_in_current_process(code_str; stacktrace)
+                return output, ""
+            finally
+                if isnothing(original_project)
+                    Pkg.activate()
+                else
+                    Pkg.activate(original_project)
+                end
+            end
+        end
+    else
+        output = _execute_code_in_current_process(code_str; stacktrace)
+        return output, ""
+    end
 end
 
 # ── Public entry point ─────────────────────────────────────────────────────────
@@ -565,7 +600,14 @@ function _run_mwe(
             stacktrace,
         )
     else
-        _run_in_current_process(code_str; stacktrace)
+        _run_in_current_process(
+            code_str;
+            temp,
+            packagespecs,
+            manifest_path,
+            verbose,
+            stacktrace,
+        )
     end
 
     lang = venue === :gh ? "julia" : ""

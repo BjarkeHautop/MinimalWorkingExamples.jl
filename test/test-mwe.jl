@@ -223,6 +223,21 @@ end
     @test !contains(result.md, "<sup>")
 end
 
+@testitem "temp=true with newprocess=false work with pkgs" tags=[:integration, :slow] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "using Example\nExample.hello(\"World\")";
+        temp = true,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+    )
+    @test contains(result.md, "using Example")
+    @test contains(result.md, "Example.hello(\"World\")")
+    @test contains(result.md, "#> ")
+    @test contains(result.md, "Hello, World")
+end
+
 # ── error handling ────────────────────────────────────────────────────────────
 
 @testitem "parse error shown cleanly as #> ERROR:" tags=[:unit, :fast] begin
