@@ -402,8 +402,6 @@ end
         advertise = false,
         packagespecs = [],
     )
-    # @v#.# in LOAD_PATH lets globally-installed packages leak into the MWE
-    # without being declared in packagespecs — this test fails until the fix
     @test !contains(result.md, "@v")
 end
 
