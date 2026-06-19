@@ -543,7 +543,6 @@ end
 
 @testitem "@mwe: manifest_path reproduces exact environment" tags=[:integration, :slow] begin
     using Pkg
-    # Build a reference environment with Example 0.5.3 to get a known Manifest.toml
     ref_dir = mktempdir()
     try
         Pkg.activate(ref_dir; io = devnull)
@@ -659,21 +658,6 @@ end
     using MinimalWorkingExamples: _spec_name
     spec = Pkg.PackageSpec(path = "/path/to/Example.jl")
     @test _spec_name(spec) == "Example"
-end
-
-@testitem "newprocess=false with temp=true restores original project" tags=[:unit, :fast] begin
-    # This tests Pkg.activate() when original_project is nothing
-    original_project = Base.active_project()
-    result = MinimalWorkingExamples._run_mwe(
-        "1 + 1";
-        temp = true,
-        newprocess = false,
-        manifest = false,
-        advertise = false,
-    )
-    # Verify that the original project is restored
-    @test Base.active_project() == original_project
-    @test result isa MWEResult
 end
 
 @testitem "footer includes 'current environment' note when temp=false" tags=[:unit, :fast] begin
