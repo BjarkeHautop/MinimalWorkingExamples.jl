@@ -583,3 +583,106 @@ end
     @test contains(result.md, "Stats.mean(x)")
     @test contains(result.md, "#> 2.0")
 end
+
+@testitem "MWEResult: String conversion" tags=[:unit, :fast] begin
+    using MinimalWorkingExamples: MWEResult
+    result = MWEResult("test markdown content")
+    @test String(result) == "test markdown content"
+end
+
+@testitem "MWEResult: show method for text/plain" tags=[:unit, :fast] begin
+    using MinimalWorkingExamples: MWEResult
+    result = MWEResult("test content")
+    buf = IOBuffer()
+    show(buf, MIME"text/plain"(), result)
+    # The show method returns nothing, so buffer should be empty
+    @test String(take!(buf)) == ""
+end
+
+@testitem "MWEResult: show method outputs markdown" tags=[:unit, :fast] begin
+    using MinimalWorkingExamples: MWEResult
+    result = MWEResult("```julia\n1 + 1\n#> 2\n```")
+    buf = IOBuffer()
+    show(buf, result)
+    @test contains(String(take!(buf)), "1 + 1")
+end
+
+@testitem "_describe_packagespec: version pinning" tags=[:unit, :fast] begin
+    using Pkg
+    using MinimalWorkingExamples: _describe_packagespec
+    spec = Pkg.PackageSpec(name = "Example", version = "0.5.3")
+    desc = _describe_packagespec(spec)
+    @test desc == "Example v0.5.3"
+end
+
+@testitem "_describe_packagespec: git revision" tags=[:unit, :fast] begin
+    using Pkg
+    using MinimalWorkingExamples: _describe_packagespec
+    spec = Pkg.PackageSpec(name = "Example", rev = "master")
+    desc = _describe_packagespec(spec)
+    @test desc == "Example#master"
+end
+
+@testitem "_describe_packagespec: URL" tags=[:unit, :fast] begin
+    using Pkg
+    using MinimalWorkingExamples: _describe_packagespec
+    spec = Pkg.PackageSpec(url = "https://github.com/JuliaLang/Example.jl")
+    desc = _describe_packagespec(spec)
+    @test contains(desc, "Example")
+    @test contains(desc, "github.com")
+end
+
+@testitem "_describe_packagespec: local path" tags=[:unit, :fast] begin
+    using Pkg
+    using MinimalWorkingExamples: _describe_packagespec
+    spec = Pkg.PackageSpec(path = "/path/to/Example.jl")
+    desc = _describe_packagespec(spec)
+    @test desc == "Example (local)"
+end
+
+@testitem "_spec_name: from name field" tags=[:unit, :fast] begin
+    using Pkg
+    using MinimalWorkingExamples: _spec_name
+    spec = Pkg.PackageSpec(name = "Example")
+    @test _spec_name(spec) == "Example"
+end
+
+@testitem "_spec_name: from URL" tags=[:unit, :fast] begin
+    using Pkg
+    using MinimalWorkingExamples: _spec_name
+    spec = Pkg.PackageSpec(url = "https://github.com/JuliaLang/Example.jl")
+    @test _spec_name(spec) == "Example"
+end
+
+@testitem "_spec_name: from path" tags=[:unit, :fast] begin
+    using Pkg
+    using MinimalWorkingExamples: _spec_name
+    spec = Pkg.PackageSpec(path = "/path/to/Example.jl")
+    @test _spec_name(spec) == "Example"
+end
+
+@testitem "newprocess=false with temp=true restores original project" tags=[:unit, :fast] begin
+    # This tests Pkg.activate() when original_project is nothing
+    original_project = Base.active_project()
+    result = MinimalWorkingExamples._run_mwe(
+        "1 + 1";
+        temp = true,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+    )
+    # Verify that the original project is restored
+    @test Base.active_project() == original_project
+    @test result isa MWEResult
+end
+
+@testitem "footer includes 'current environment' note when temp=false" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "1 + 1";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = true,
+    )
+    @test contains(result.md, "current environment")
+end
