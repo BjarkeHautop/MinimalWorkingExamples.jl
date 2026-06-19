@@ -6,7 +6,7 @@ Here we explain the advanced settings and when you might want to use them. Since
 
 ## `newprocess`
 
-By default (`newprocess=true`), the example runs in a separate Julia process and cannot access definitions from your current session.
+By default (`newprocess=true`), the example runs in a separate Julia process and cannot access definitions from your current session. Additionally, user startup files are disabled in this fresh process.
 
 If you set `newprocess=false`, the example runs in the current Julia session and can access existing definitions:
 

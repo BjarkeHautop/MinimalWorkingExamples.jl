@@ -24,8 +24,9 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
 - `temp=true`: create a temporary isolated environment and auto-add packages from `using`/`import`.
   When `false`, code runs in the current environment without auto-adding packages (to avoid
   polluting the user's project).
-- `newprocess=true`: run the MWE in a fresh Julia process for reproducibility. If `temp=true` and
-  `newprocess=false`, the temporary project is activated, code runs, and the original project state is restored afterward.
+- `newprocess=true`: run the MWE in a fresh Julia process; startup files are disabled to ensure
+  reproducibility. If `newprocess=false`, the MWE runs in the current session. If also `temp=true`,
+  a temporary project is activated for the execution and then restored.
 - `manifest=false`: append the `Manifest.toml` in a collapsible `<details>` block.
 - `advertise`: append a footer noting the date, this package, and Julia version used.
   Defaults to `true` for `:gh` and `false` for `:slack`; can be set explicitly to override.
