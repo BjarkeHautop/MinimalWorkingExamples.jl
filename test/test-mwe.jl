@@ -173,7 +173,7 @@ end
         packagespecs = [PackageSpec(name = "Example", version = "0.5.3")],
     )
     @test contains(result.md, "pinned:")
-    @test contains(result.md, "Example@0.5.3")
+    @test contains(result.md, "Example v0.5.3")
 end
 
 @testitem "footer note: from existing Manifest.toml" tags=[:unit, :fast] begin
@@ -401,7 +401,8 @@ end
     using Pkg
     using MinimalWorkingExamples: _describe_packagespec
 
-    @test _describe_packagespec(PackageSpec(name = "Foo", version = "1.2.3")) == "Foo@1.2.3"
+    @test _describe_packagespec(PackageSpec(name = "Foo", version = "1.2.3")) ==
+          "Foo v1.2.3"
     @test _describe_packagespec(PackageSpec(name = "Foo")) == "Foo"
     @test _describe_packagespec(PackageSpec(name = "Foo", rev = "main")) == "Foo#main"
 end

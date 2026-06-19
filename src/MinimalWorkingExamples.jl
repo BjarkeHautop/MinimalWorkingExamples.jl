@@ -323,7 +323,7 @@ function _describe_packagespec(spec::Pkg.PackageSpec)
     path = _get(() -> spec.path)
 
     if !isnothing(v_str)
-        "$name@$v_str"
+        "$name v$v_str"
     elseif !isnothing(rev)
         "$name#$rev"
     elseif !isnothing(url)
