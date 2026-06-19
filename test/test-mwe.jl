@@ -510,6 +510,18 @@ end
     @test contains(result.md, "0.5.3")   # pinned version appears in Manifest
 end
 
+@testitem "@mwe: packagespecs works with url" tags=[:integration, :slow] begin
+    using Pkg
+    url = "https://github.com/JuliaLang/Example.jl"
+    result = @mwe begin
+        using Example
+        Example.hello("World")
+    end packagespecs=[PackageSpec(url = url)]
+    @test result isa MWEResult
+    @test contains(result.md, "Hello, World")
+    @test contains(result.md, url)
+end
+
 @testitem "@mwe: manifest_path reproduces exact environment" tags=[:integration, :slow] begin
     using Pkg
     # Build a reference environment with Example 0.5.3 to get a known Manifest.toml

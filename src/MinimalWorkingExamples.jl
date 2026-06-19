@@ -222,6 +222,33 @@ function _extract_packages(code_str::AbstractString)
     return filter(!_is_stdlib, unique(packages))
 end
 
+function _spec_name(spec::Pkg.PackageSpec)
+    n = try
+        spec.name
+    catch
+        ;
+        nothing
+    end
+    !isnothing(n) && !isempty(n) && return n
+    src = try
+        spec.url
+    catch
+        ;
+        nothing
+    end
+    if isnothing(src)
+        src = try
+            spec.path
+        catch
+            ;
+            nothing
+        end
+    end
+    isnothing(src) && return nothing
+    base = basename(rstrip(src, '/'))
+    return endswith(base, ".jl") ? base[1:(end-3)] : base
+end
+
 function _repr_packagespec(spec::Pkg.PackageSpec)
     parts = String[]
     _get(f) =
@@ -268,8 +295,8 @@ function _describe_packagespec(spec::Pkg.PackageSpec)
             nothing
         end
 
-    name = let n = _get(() -> spec.name);
-        (!isnothing(n) && !isempty(n)) ? n : "?"
+    name = let n = _spec_name(spec);
+        isnothing(n) ? "?" : n
     end
 
     v = _get(() -> spec.version)
@@ -291,7 +318,7 @@ function _describe_packagespec(spec::Pkg.PackageSpec)
     elseif !isnothing(rev)
         "$name#$rev"
     elseif !isnothing(url)
-        "$name (url)"
+        "$name ($url)"
     elseif !isnothing(path) && !isempty(path)
         "$name (local)"
     else
@@ -396,15 +423,11 @@ function _setup_temp_env!(
     else
         packages = _extract_packages(code_str)
 
-        spec_names =
-            Set(s.name for s in packagespecs if !isnothing(s.name) && !isempty(s.name))
+        spec_names = Set(filter(!isnothing, _spec_name.(packagespecs)))
         packages = filter(p -> p ∉ spec_names, packages)
 
         append!(install_names, packages)
-        append!(
-            install_names,
-            [s.name for s in packagespecs if !isnothing(s.name) && !isempty(s.name)],
-        )
+        append!(install_names, filter(!isnothing, _spec_name.(packagespecs)))
 
         add_stmts = String[]
         isempty(packages) || push!(add_stmts, "Pkg.add([$(join(repr.(packages), ", "))])")
