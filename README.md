@@ -126,4 +126,7 @@ end manifest_path="/path/to/your/Manifest.toml"
 
 - Allow the user to set different defaults using Preferences.jl?
 
+- Implement a `@mwe_self` or similar so MinimalWorkingExamples can be used
+to report bugs about itself easily?
+
 - Support plots like reprex does? (low priority?)

@@ -37,6 +37,9 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
   setup.
 - `stacktrace=false`: if `true`, append the full stacktrace after the error message.
 
+!!! note
+    Comments in the code block are not preserved in the output. Use [`mwe`](@ref) if you need to preserve comments.
+
 # Examples
 
 ```julia
@@ -105,7 +108,8 @@ end
 
 """
     mwe([code]; venue=:gh, temp=true, newprocess=true, manifest=false, advertise=nothing,
-               packagespecs=PackageSpec[], manifest_path=nothing, verbose=false, stacktrace=false)
+               packagespecs=PackageSpec[], manifest_path=nothing, verbose=false, stacktrace=false,
+               quiet=false)
 
 Function form of [`@mwe`](@ref). Accepts code as a plain string.
 If `code` is omitted, reads Julia source from the clipboard.
@@ -123,6 +127,11 @@ mwe(; venue=:slack)
 mwe(\"""
 using Statistics
 mean([1, 2, 3])
+\""")
+
+# Comments are preserved:
+mwe(\"""
+1+1 # This comment is preserved
 \""")
 ```
 """
