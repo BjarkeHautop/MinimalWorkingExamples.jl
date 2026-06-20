@@ -2,7 +2,14 @@
 
 MinimalWorkingExamples.jl is designed to make examples reproducible by running them in isolation. The defaults should work for most users and use cases.
 
-Here we explain the advanced settings and when you might want to use them. Since these settings can affect reproducibility, any non-default behavior is noted in the generated footer.
+The defaults can be changed by using [`set_defaults!`](@ref):
+
+```julia
+using MinimalWorkingExamples
+set_defaults!(venue=:slack, temp=false)
+```
+
+We will now explain some of the more advanced settings and when you might want to use them. Since these settings can affect reproducibility, any non-default behavior is noted in the generated footer.
 
 ## `newprocess`
 
@@ -30,9 +37,7 @@ When `temp=false`, the code runs in the current environment without auto-adding 
 
 ## `packagespecs`
 
-The main use of `packagespecs` is probably to check if
-the development version of the package solves the bug
-you encountered
+The main use of `packagespecs` is to test a development version of a package, for example, to check whether it fixes a bug:
 
 ```julia
 using Pkg
@@ -42,5 +47,18 @@ using Pkg
     Example.hello()
 end packagespecs=[
     PackageSpec(url = "https://github.com/JuliaLang/Example.jl")
+]
+```
+
+or to showcase new behavior for your PR:
+
+```julia
+using Pkg
+
+@mwe begin
+    using Example
+    Example.hello()
+end packagespecs=[
+    PackageSpec(url = "https://github.com/YourUsername/Example.jl", rev = "my-new-feature")
 ]
 ```

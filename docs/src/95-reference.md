@@ -16,4 +16,5 @@ Pages = ["95-reference.md"]
 @mwe
 mwe
 MWEResult
+set_defaults!
 ```

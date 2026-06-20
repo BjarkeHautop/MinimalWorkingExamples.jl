@@ -4,8 +4,77 @@ using Dates: today
 using Logging
 using Pkg
 using InteractiveUtils: clipboard
+using Preferences: load_preference, set_preferences!
 
-export @mwe, mwe, MWEResult
+export @mwe, mwe, MWEResult, set_defaults!
+
+const _DEFAULTS = (
+    venue = :gh,
+    temp = true,
+    newprocess = true,
+    manifest = false,
+    advertise = nothing,
+    verbose = false,
+    stacktrace = false,
+)
+
+function _default(key::Symbol)
+    haskey(_DEFAULTS, key) || error("unknown default $(repr(key))")
+    stored = load_preference(MinimalWorkingExamples, String(key))
+    isnothing(stored) && return _DEFAULTS[key]
+    key === :venue && return Symbol(stored)
+    return stored
+end
+
+_defaults() = (; (k => _default(k) for k in keys(_DEFAULTS))...)
+
+"""
+    set_defaults!(; kwargs...)
+
+Persistently override the default keyword arguments of [`@mwe`](@ref) and
+[`mwe`](@ref) using [Preferences.jl](https://github.com/JuliaPackaging/Preferences.jl).
+
+Any of `venue`, `temp`, `newprocess`, `manifest`, `advertise`, `verbose`, and
+`stacktrace` may be set. Passing `nothing` for a key clears it, reverting to the
+built-in default.
+
+# Examples
+
+```julia
+# Always format for Slack and skip the isolated environment:
+set_defaults!(venue=:slack, temp=false)
+
+# Go back to the built-in venue default:
+set_defaults!(venue=nothing)
+```
+"""
+function set_defaults!(; kwargs...)
+    isempty(kwargs) && throw(
+        ArgumentError(
+            "Provide at least one default to set, e.g. `set_defaults!(venue=:slack)`",
+        ),
+    )
+    prefs = Pair{String,Any}[]
+    for (k, v) in kwargs
+        haskey(_DEFAULTS, k) || throw(
+            ArgumentError(
+                "`$k` is not a configurable default; choose from: $(join(keys(_DEFAULTS), ", "))",
+            ),
+        )
+        if isnothing(v)
+            push!(prefs, String(k) => nothing)  # delete -> revert to built-in
+        elseif k === :venue
+            v in (:gh, :slack) ||
+                throw(ArgumentError("venue must be :gh or :slack, got $(repr(v))"))
+            push!(prefs, String(k) => String(v))
+        else
+            push!(prefs, String(k) => v)
+        end
+    end
+    set_preferences!(MinimalWorkingExamples, prefs...; force = true)
+    @info "Defaults updated."
+    return nothing
+end
 
 """
     @mwe begin
@@ -40,6 +109,10 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
 
 !!! note
     Comments in the code block are not preserved in the output. Use [`mwe`](@ref) if you need to preserve comments.
+
+!!! tip
+    The defaults above (except `packagespecs` and `manifest_path`) can be changed
+    persistently with [`set_defaults!`](@ref).
 
 # Examples
 
@@ -84,27 +157,16 @@ end stacktrace=true
 macro mwe(ex, kwargs...)
     code_str = _block_to_code_string(ex)
 
-    kw = Dict{Symbol,Any}()
+    # Forward only the keyword arguments the user actually wrote; `_run_mwe`
+    # supplies the rest from the (possibly user-configured) defaults.
+    params = Expr(:parameters)
     for kwarg in kwargs
         if kwarg isa Expr && kwarg.head == :(=)
-            kw[kwarg.args[1]] = esc(kwarg.args[2])
+            push!(params.args, Expr(:kw, kwarg.args[1], esc(kwarg.args[2])))
         end
     end
 
-    return quote
-        MinimalWorkingExamples._run_mwe(
-            $code_str;
-            venue = $(get(kw, :venue, :(:gh))),
-            temp = $(get(kw, :temp, true)),
-            newprocess = $(get(kw, :newprocess, true)),
-            manifest = $(get(kw, :manifest, false)),
-            advertise = $(get(kw, :advertise, nothing)),
-            packagespecs = $(get(kw, :packagespecs, :(Pkg.PackageSpec[]))),
-            manifest_path = $(get(kw, :manifest_path, nothing)),
-            verbose = $(get(kw, :verbose, false)),
-            stacktrace = $(get(kw, :stacktrace, false)),
-        )
-    end
+    return Expr(:call, :(MinimalWorkingExamples._run_mwe), params, code_str)
 end
 
 """
@@ -137,15 +199,15 @@ mwe(\"""
 """
 function mwe(
     code::AbstractString = clipboard();
-    venue::Symbol = :gh,
-    temp::Bool = true,
-    newprocess::Bool = true,
-    manifest::Bool = false,
-    advertise::Union{Bool,Nothing} = nothing,
+    venue::Symbol = _default(:venue),
+    temp::Bool = _default(:temp),
+    newprocess::Bool = _default(:newprocess),
+    manifest::Bool = _default(:manifest),
+    advertise::Union{Bool,Nothing} = _default(:advertise),
     packagespecs::Vector = Pkg.PackageSpec[],
     manifest_path::Union{AbstractString,Nothing} = nothing,
-    verbose::Bool = false,
-    stacktrace::Bool = false,
+    verbose::Bool = _default(:verbose),
+    stacktrace::Bool = _default(:stacktrace),
 )
     _run_mwe(
         code;
@@ -642,15 +704,15 @@ end
 
 function _run_mwe(
     code_str::AbstractString;
-    venue::Symbol = :gh,
-    temp::Bool = true,
-    newprocess::Bool = true,
-    manifest::Bool = false,
-    advertise::Union{Bool,Nothing} = nothing,
+    venue::Symbol = _default(:venue),
+    temp::Bool = _default(:temp),
+    newprocess::Bool = _default(:newprocess),
+    manifest::Bool = _default(:manifest),
+    advertise::Union{Bool,Nothing} = _default(:advertise),
     packagespecs::Vector = Pkg.PackageSpec[],
     manifest_path::Union{AbstractString,Nothing} = nothing,
-    verbose::Bool = false,
-    stacktrace::Bool = false,
+    verbose::Bool = _default(:verbose),
+    stacktrace::Bool = _default(:stacktrace),
 )
     venue in (:gh, :slack) || error("venue must be :gh or :slack, got $(repr(venue))")
     if !isnothing(manifest_path) && !isempty(packagespecs)

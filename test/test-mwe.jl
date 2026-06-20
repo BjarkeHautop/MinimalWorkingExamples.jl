@@ -670,3 +670,35 @@ end
     )
     @test contains(result.md, "current environment")
 end
+
+# Configurable defaults
+
+@testitem "defaults reflects built-in fallbacks" tags=[:unit, :fast] begin
+    using MinimalWorkingExamples: _DEFAULTS, _defaults
+    d = _defaults()
+    @test keys(d) == keys(_DEFAULTS)
+end
+
+@testitem "set_defaults! validates keys and values" tags=[:unit, :fast] begin
+    @test_throws ArgumentError set_defaults!()
+    @test_throws ArgumentError set_defaults!(bogus = 1)
+    @test_throws ArgumentError set_defaults!(venue = :nope)
+end
+
+@testitem "set_defaults! overrides defaults and clears back" tags=[:unit, :fast] begin
+    try
+        set_defaults!(venue = :slack, temp = false)
+        @test MinimalWorkingExamples._defaults().venue == :slack
+        @test MinimalWorkingExamples._defaults().temp == false
+
+        r = MinimalWorkingExamples._run_mwe("1 + 1"; newprocess = false, advertise = false)
+        @test !contains(r.md, "```julia")
+
+        r2 = mwe("1 + 1"; venue = :gh, newprocess = false, temp = false, advertise = false)
+        @test contains(r2.md, "```julia")
+    finally
+        set_defaults!(venue = nothing, temp = nothing)
+    end
+    @test MinimalWorkingExamples._defaults().venue == :gh
+    @test MinimalWorkingExamples._defaults().temp == true
+end
