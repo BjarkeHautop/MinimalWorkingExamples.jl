@@ -6,7 +6,7 @@ using Pkg
 using InteractiveUtils: clipboard
 using Preferences: load_preference, set_preferences!
 
-export @mwe, mwe, MWEResult, set_defaults!
+export @mwe, MWEResult, mwe, set_defaults!
 
 const _DEFAULTS = (
     venue = :gh,
@@ -54,24 +54,32 @@ function set_defaults!(; kwargs...)
             "Provide at least one default to set, e.g. `set_defaults!(venue=:slack)`",
         ),
     )
+
     prefs = Pair{String,Any}[]
+
     for (k, v) in kwargs
         haskey(_DEFAULTS, k) || throw(
             ArgumentError(
                 "`$k` is not a configurable default; choose from: $(join(keys(_DEFAULTS), ", "))",
             ),
         )
+
         if isnothing(v)
             push!(prefs, String(k) => nothing)  # delete -> revert to built-in
+
         elseif k === :venue
-            v in (:gh, :slack) ||
+            (v === :gh || v === :slack) ||
                 throw(ArgumentError("venue must be :gh or :slack, got $(repr(v))"))
+
             push!(prefs, String(k) => String(v))
+
         else
             push!(prefs, String(k) => v)
         end
     end
+
     set_preferences!(MinimalWorkingExamples, prefs...; force = true)
+
     @info "Defaults updated."
     return nothing
 end
@@ -576,21 +584,31 @@ function _run_in_new_process(
     end
 end
 
+struct CapturedError{E,B<:Vector}
+    exception::E
+    backtrace::B
+end
+
+struct EvalResult{V,E<:Union{Nothing,CapturedError}}
+    value::V
+    stdout::String
+    stderr::String
+    error::E
+end
+
 function _capture_eval(ex)
     original_out = Base.stdout
     original_err = Base.stderr
     rd_out, wr_out = redirect_stdout()
     rd_err, wr_err = redirect_stderr()
     local val = nothing
-    local err = nothing
-    local bt = nothing
+    local captured_error = nothing
     try
         val = Logging.with_logger(Logging.ConsoleLogger(wr_err, Logging.Info)) do
             Base.invokelatest(Core.eval, Main, ex)
         end
     catch e
-        err = e
-        bt = catch_backtrace()
+        captured_error = CapturedError(e, catch_backtrace())
     finally
         redirect_stdout(original_out)
         redirect_stderr(original_err)
@@ -601,7 +619,7 @@ function _capture_eval(ex)
     captured_err = read(rd_err, String)
     close(rd_out)
     close(rd_err)
-    return val, captured_out, captured_err, err, bt
+    return EvalResult(val, captured_out, captured_err, captured_error)
 end
 
 function _prefix_lines(io::IO, str::AbstractString, prefix::AbstractString)
@@ -613,17 +631,17 @@ end
 
 # Keep only frames above the Core.eval boundary — everything below is driver
 # or REPL infrastructure irrelevant to the user's code.
-function _user_frames(bt)
+function _user_frames(bt::Vector)
     frames = Base.stacktrace(bt)
     cutoff = findfirst(f -> f.func === :eval && endswith(String(f.file), "boot.jl"), frames)
     return isnothing(cutoff) ? frames : frames[1:(cutoff-1)]
 end
 
-function _format_error(err, bt; stacktrace::Bool = false)
-    stacktrace || return sprint(showerror, err)
-    frames = _user_frames(bt)
+function _format_error(ce::CapturedError; stacktrace::Bool = false)
+    stacktrace || return sprint(showerror, ce.exception)
+    frames = _user_frames(ce.backtrace)
     st = isempty(frames) ? "" : "\n" * sprint(Base.show_backtrace, frames)
-    return sprint(showerror, err) * st
+    return sprint(showerror, ce.exception) * st
 end
 
 function _execute_code_in_current_process(
@@ -649,20 +667,21 @@ function _execute_code_in_current_process(
         end
         end_line = i < length(items) ? items[i+1][1] - 1 : length(src_lines)
         ex_str = rstrip(join(src_lines[start_line:end_line], '\n'))
-        val, captured_out, captured_err, err, bt = _capture_eval(node)
+        result = _capture_eval(node)
         println(buf, ex_str)
-        _prefix_lines(buf, captured_out, "#> ")
-        _prefix_lines(buf, captured_err, "#> ")
+        _prefix_lines(buf, result.stdout, "#> ")
+        _prefix_lines(buf, result.stderr, "#> ")
+        err = result.error
         if !isnothing(err)
-            _prefix_lines(buf, "ERROR: " * _format_error(err, bt; stacktrace), "#> ")
+            _prefix_lines(buf, "ERROR: " * _format_error(err; stacktrace), "#> ")
             break
         end
-        if i == length(items) && val !== nothing
+        if i == length(items) && result.value !== nothing
             val_buf = IOBuffer()
             show(
                 IOContext(val_buf, :limit => true, :color => false),
                 MIME"text/plain"(),
-                val,
+                result.value,
             )
             _prefix_lines(buf, String(take!(val_buf)), "#> ")
         end
@@ -695,8 +714,7 @@ function _run_in_current_process(
             end
         end
     else
-        output = _execute_code_in_current_process(code_str; stacktrace)
-        return output, ""
+        return _execute_code_in_current_process(code_str; stacktrace), ""
     end
 end
 
