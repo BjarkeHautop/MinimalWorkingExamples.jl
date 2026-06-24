@@ -14,11 +14,11 @@ Inspired by the R package [reprex](https://reprex.tidyverse.org/).
 
 ## Installation
 
-Not yet registered. Install directly from GitHub:
+MinimalWorkingExamples can be installed directly from the Julia package manager. In the Julia REPL, press `]`
+to enter the Pkg mode, then run:
 
 ```julia
-using Pkg
-Pkg.add(url="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl")
+pkg> add MinimalWorkingExamples
 ```
 
 ## Basic usage
@@ -46,7 +46,7 @@ mean(x)
 ```
 ````
 
-<sup>Created on 2026-06-21 with [MinimalWorkingExamples v0.1.0](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia 1.12.6</sup>
+<sup>Created on 2026-06-24 with [MinimalWorkingExamples v0.1.0](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia 1.12.6</sup>
 
 The value of the last expression is shown as `#>`, as are any `print` calls and log messages (`@warn`, `@info`) in the code.
 

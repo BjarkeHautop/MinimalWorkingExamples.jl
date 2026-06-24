@@ -10,11 +10,11 @@ Inspired by the R package [reprex](https://reprex.tidyverse.org/).
 
 ## Installation
 
-Not yet registered. Install directly from GitHub:
+MinimalWorkingExamples can be installed directly from the Julia package manager. In the Julia REPL, press `]`
+to enter the Pkg mode, then run:
 
 ```julia
-using Pkg
-Pkg.add(url="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl")
+pkg> add MinimalWorkingExamples
 ```
 
 ## Basic usage
