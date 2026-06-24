@@ -18,6 +18,8 @@ on:
       - "*.toml"
     types: [opened, synchronize, reopened]
 
+  workflow_dispatch:
+
 concurrency:
   # Skip intermediate builds: always.
   # Cancel intermediate builds: only if it is a pull request build.
