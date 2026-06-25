@@ -77,13 +77,15 @@ mean([1, 2, 3])
 ## Venue
 
 The `venue` keyword controls the output format. Use `:gh` (default) for GitHub, Discourse, and other
-platforms that render GitHub-Flavored Markdown, and `:slack` for Slack.
+platforms that render GitHub-Flavored Markdown, `:discord` for Discord, and `:slack` for Slack.
 
 ```julia
 @mwe begin
     1 + 1
 end venue=:slack
 ```
+
+`:discord` matches `:gh` but renders the attribution footer using Discord's `-#` subtext syntax instead of `<sup>`.
 
 `:slack` strips the language identifier from the code fence (Slack doesn't render language-tagged fences) and omits the attribution footer.
 

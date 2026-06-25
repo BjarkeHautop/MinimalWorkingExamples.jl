@@ -46,8 +46,6 @@ mean(x)
 ```
 ````
 
-<sup>Created on 2026-06-24 with [MinimalWorkingExamples v0.1.0](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia 1.12.6</sup>
-
 The value of the last expression is shown as `#>`, as are any `print` calls and log messages (`@warn`, `@info`) in the code.
 
 `mwe` is the function version of the macro. If the first argument is not given, code is read from the clipboard:

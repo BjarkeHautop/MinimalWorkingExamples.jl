@@ -150,6 +150,32 @@ end
     @test contains(result.md, "<sup>")
 end
 
+@testitem "venue=:discord uses julia language tag" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "1 + 1";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+        venue = :discord,
+    )
+    @test startswith(result.md, "```julia\n")
+end
+
+@testitem "venue=:discord uses -# subtext for advertise note" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "1 + 1";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        packagespecs = [],
+        venue = :discord,
+    )
+    @test contains(result.md, "\n-# Created on")
+    @test !contains(result.md, "<sup>")
+end
+
 @testitem "footer note: in-process when newprocess=false" tags=[:unit, :fast] begin
     result = MinimalWorkingExamples._run_mwe(
         "1 + 1";

@@ -68,8 +68,9 @@ function set_defaults!(; kwargs...)
             push!(prefs, String(k) => nothing)  # delete -> revert to built-in
 
         elseif k === :venue
-            (v === :gh || v === :slack) ||
-                throw(ArgumentError("venue must be :gh or :slack, got $(repr(v))"))
+            (v === :gh || v === :discord || v === :slack) || throw(
+                ArgumentError("venue must be :gh, :discord or :slack, got $(repr(v))"),
+            )
 
             push!(prefs, String(k) => String(v))
 
@@ -96,8 +97,9 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
 (and any `print`/logging calls) shown as `#>` comments.
 
 # Keyword arguments
-- `venue=:gh`: output format — `:gh` for GitHub-Flavored Markdown (default), `:slack` for Slack
-  (strips the language identifier from the code fence).
+- `venue=:gh`: output format — `:gh` for GitHub-Flavored Markdown (default), `:discord` for Discord
+  (same as `:gh` but the advertisement note uses Discord's `-# ` subtext syntax instead of `<sup>`),
+  `:slack` for Slack (strips the language identifier from the code fence).
 - `temp=true`: create a temporary isolated environment and auto-add packages from `using`/`import`.
   When `false`, code runs in the current environment without auto-adding packages (to avoid
   polluting the user's project).
@@ -106,7 +108,7 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
   a temporary project is activated for the execution and then restored.
 - `manifest=false`: append the `Manifest.toml` in a collapsible `<details>` block.
 - `advertise`: append a footer noting the date, this package, and Julia version used.
-  Defaults to `true` for `:gh` and `false` for `:slack`; can be set explicitly to override.
+  Defaults to `false` for `:slack` and `true` otherwise; can be set explicitly to override.
 - `packagespecs=PackageSpec[]`: vector of [`Pkg.PackageSpec`](https://pkgdocs.julialang.org/v1/api/#Pkg.PackageSpec)s for packages that need a specific
   version, git revision, URL, or local path.
 - `manifest_path=nothing`: path to an existing `Manifest.toml` to use as-is.
@@ -732,11 +734,12 @@ function _run_mwe(
     verbose::Bool = _default(:verbose),
     stacktrace::Bool = _default(:stacktrace),
 )
-    venue in (:gh, :slack) || error("venue must be :gh or :slack, got $(repr(venue))")
+    venue in (:gh, :discord, :slack) ||
+        error("venue must be :gh, :discord or :slack, got $(repr(venue))")
     if !isnothing(manifest_path) && !isempty(packagespecs)
         error("`manifest_path` and `packagespecs` are mutually exclusive; pass only one")
     end
-    _advertise = isnothing(advertise) ? (venue === :gh) : advertise
+    _advertise = isnothing(advertise) ? (venue !== :slack) : advertise
 
     repl_output, manifest_str = if newprocess
         _run_in_new_process(
@@ -759,7 +762,7 @@ function _run_mwe(
         )
     end
 
-    lang = venue === :gh ? "julia" : ""
+    lang = venue === :slack ? "" : "julia"
     md = "```$lang\n$repl_output\n```"
     if _advertise
         notes = String[]
@@ -771,7 +774,8 @@ function _run_mwe(
             push!(notes, "pinned: " * join(_describe_packagespec.(packagespecs), ", "))
         end
         extra = isempty(notes) ? "" : " · " * join(notes, " · ")
-        md *= "\n\n<sup>Created on $(today()) with [MinimalWorkingExamples v$(pkgversion(MinimalWorkingExamples))](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia $VERSION$extra</sup>"
+        note = "Created on $(today()) with [MinimalWorkingExamples v$(pkgversion(MinimalWorkingExamples))](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia $VERSION$extra"
+        md *= venue === :discord ? "\n\n-# $note" : "\n\n<sup>$note</sup>"
     end
     if manifest && !isempty(manifest_str)
         md *= "\n\n<details>\n<summary>Manifest.toml</summary>\n\n```toml\n$manifest_str\n```\n\n</details>"
