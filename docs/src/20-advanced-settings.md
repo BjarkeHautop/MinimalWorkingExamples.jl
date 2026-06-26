@@ -1,15 +1,13 @@
 # Advanced Settings
 
-MinimalWorkingExamples.jl is designed to make examples reproducible by running them in isolation. The defaults should work for most users and use cases.
-
-The defaults can be changed by using [`set_defaults!`](@ref):
+Almost all defaults can be changed by using [`set_defaults!`](@ref):
 
 ```julia
 using MinimalWorkingExamples
 set_defaults!(venue=:slack, temp=false)
 ```
 
-We will now explain some of the more advanced settings and when you might want to use them. Since these settings can affect reproducibility, any non-default behavior is noted in the generated footer.
+MinimalWorkingExamples.jl is designed to produce reproducible examples by running them in isolation. The settings described below provide more advanced control over this behaviour. Because these settings can affect reproducibility, any non-default values are recorded in the generated footer.
 
 ## `newprocess`
 
@@ -25,7 +23,7 @@ f(x) = 2x
 end newprocess=false
 ```
 
-This is primarily useful for reducing generation time by reusing work already performed in the current session, such as loading large packages.
+This is primarily useful for reducing generation time by reusing work already performed in the current session.
 
 Since the generated example can depend on session state that is not shown in the MWE, this feature should be used with care when sharing examples.
 
@@ -33,7 +31,7 @@ Since the generated example can depend on session state that is not shown in the
 
 By default (`temp=true`), a temporary environment is created and packages are installed automatically from the `using` and `import` statements found in the example.
 
-When `temp=false`, the code runs in the current environment without auto-adding packages. This is often faster because it reuses packages from the current environment. However, if the issue depends on specific package versions in your local environment, `temp=true` ensures a fresh environment is used and can help rule out environment-specific behavior.
+When `temp=false`, the code runs in the current environment without auto-adding packages, hence avoiding the installation and compiling of packages. However, if the issue depends on specific package versions in your local environment, `temp=true` ensures a fresh environment is used and can help rule out environment-specific behaviour.
 
 ## `packagespecs`
 
@@ -50,7 +48,7 @@ end packagespecs=[
 ]
 ```
 
-or to showcase new behavior for your PR:
+or to showcase new behaviour for your PR:
 
 ```julia
 using Pkg
