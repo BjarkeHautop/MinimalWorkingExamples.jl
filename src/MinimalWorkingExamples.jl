@@ -16,7 +16,7 @@ const _DEFAULTS = (
     advertise = nothing,
     verbose = false,
     stacktrace = false,
-    versioninfo = false,
+    versioninfo = true,
     julia_args = "",
 )
 
@@ -92,7 +92,7 @@ end
         code
     end [venue=:gh] [temp=true] [newprocess=true] [manifest=false] [advertise=nothing]
         [packagespecs=PackageSpec[]] [manifest_path=nothing] [verbose=false] [stacktrace=false]
-        [versioninfo=false] [julia_args=""]
+        [versioninfo=true] [julia_args=""]
 
 Generate a Minimal Working Example (MWE) formatted as Markdown, then copy it to the clipboard.
 
@@ -119,7 +119,7 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
 - `verbose=false`: if `true`, show Pkg output (downloads, resolver messages) during environment
   setup.
 - `stacktrace=false`: if `true`, append the full stacktrace after the error message.
-- `versioninfo=false`: if `true`, append a collapsible "Environment" block showing the output
+- `versioninfo=true`: if `true`, append a collapsible "Environment" block showing the output
   of `versioninfo()`.
 - `julia_args=""`: extra command-line flags passed through to the isolated Julia process, e.g.
   `"-t 4"` or `"--check-bounds=no"`. Only valid when `newprocess=true`.
@@ -189,7 +189,7 @@ end
 """
     mwe([code]; venue=:gh, temp=true, newprocess=true, manifest=false, advertise=nothing,
                packagespecs=PackageSpec[], manifest_path=nothing, verbose=false, stacktrace=false,
-               versioninfo=false, julia_args="")
+               versioninfo=true, julia_args="")
 
 Function form of [`@mwe`](@ref). Accepts code as a plain string.
 If `code` is omitted, reads Julia source from the clipboard.
