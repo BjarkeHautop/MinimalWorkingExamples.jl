@@ -285,6 +285,7 @@ end
 # ── Package helpers ────────────────────────────────────────────────────────────
 
 function _is_stdlib(name::AbstractString)
+    name in ("Base", "Core", "Main") && return true
     return isdir(joinpath(Sys.STDLIB, name))
 end
 

@@ -13,6 +13,9 @@
     @test isempty(_extract_packages("using LinearAlgebra\nusing Statistics"))
     @test _extract_packages("using LinearAlgebra\nusing SomeFakePackage123") ==
           ["SomeFakePackage123"]
+    @test isempty(_extract_packages("using Base.Threads"))
+    @test isempty(_extract_packages("import Base.Threads: @threads"))
+    @test isempty(_extract_packages("using Core"))
 end
 
 # ── newprocess=false (fast, in-process) ───────────────────────────────────────
