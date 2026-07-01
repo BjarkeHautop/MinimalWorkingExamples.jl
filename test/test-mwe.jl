@@ -249,6 +249,22 @@ end
     @test !contains(result.md, "<sup>")
 end
 
+@testitem "versioninfo=true appends environment block" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "1 + 1";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+        versioninfo = true,
+    )
+    @test contains(result.md, "<details>")
+    @test contains(result.md, "Environment")
+    @test contains(result.md, "Julia Version")
+    @test contains(result.md, string(VERSION))
+end
+
 @testitem "temp=true with newprocess=false work with pkgs" tags=[:integration, :slow] begin
     result = MinimalWorkingExamples._run_mwe(
         "using Example\nExample.hello(\"World\")";
