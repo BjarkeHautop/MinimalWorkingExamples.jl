@@ -265,6 +265,31 @@ end
     @test contains(result.md, string(VERSION))
 end
 
+@testitem "julia_args passes flags through to the subprocess" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "Threads.nthreads()";
+        temp = false,
+        newprocess = true,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+        julia_args = "-t 4",
+    )
+    @test contains(result.md, "#> 4")
+end
+
+@testitem "julia_args requires newprocess=true" tags=[:unit, :fast] begin
+    @test_throws ErrorException MinimalWorkingExamples._run_mwe(
+        "1 + 1";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+        julia_args = "-t 4",
+    )
+end
+
 @testitem "temp=true with newprocess=false work with pkgs" tags=[:integration, :slow] begin
     result = MinimalWorkingExamples._run_mwe(
         "using Example\nExample.hello(\"World\")";

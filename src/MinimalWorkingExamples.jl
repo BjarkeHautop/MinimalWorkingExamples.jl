@@ -17,6 +17,7 @@ const _DEFAULTS = (
     verbose = false,
     stacktrace = false,
     versioninfo = false,
+    julia_args = "",
 )
 
 function _default(key::Symbol)
@@ -36,7 +37,7 @@ Persistently override the default keyword arguments of [`@mwe`](@ref) and
 [`mwe`](@ref) using [Preferences.jl](https://github.com/JuliaPackaging/Preferences.jl).
 
 Any of `venue`, `temp`, `newprocess`, `manifest`, `advertise`, `verbose`,
-`stacktrace`, and `versioninfo` may be set. Passing `nothing` for a key clears it,
+`stacktrace`, `versioninfo`, and `julia_args` may be set. Passing `nothing` for a key clears it,
 reverting to the built-in default.
 
 # Examples
@@ -91,7 +92,7 @@ end
         code
     end [venue=:gh] [temp=true] [newprocess=true] [manifest=false] [advertise=nothing]
         [packagespecs=PackageSpec[]] [manifest_path=nothing] [verbose=false] [stacktrace=false]
-        [versioninfo=false]
+        [versioninfo=false] [julia_args=""]
 
 Generate a Minimal Working Example (MWE) formatted as Markdown, then copy it to the clipboard.
 
@@ -120,6 +121,8 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
 - `stacktrace=false`: if `true`, append the full stacktrace after the error message.
 - `versioninfo=false`: if `true`, append a collapsible "Environment" block showing the output
   of `versioninfo()`.
+- `julia_args=""`: extra command-line flags passed through to the isolated Julia process, e.g.
+  `"-t 4"` or `"--check-bounds=no"`. Only valid when `newprocess=true`.
 
 !!! note
     Comments in the code block are not preserved in the output. Use [`mwe`](@ref) if you need to preserve comments.
@@ -186,7 +189,7 @@ end
 """
     mwe([code]; venue=:gh, temp=true, newprocess=true, manifest=false, advertise=nothing,
                packagespecs=PackageSpec[], manifest_path=nothing, verbose=false, stacktrace=false,
-               versioninfo=false)
+               versioninfo=false, julia_args="")
 
 Function form of [`@mwe`](@ref). Accepts code as a plain string.
 If `code` is omitted, reads Julia source from the clipboard.
@@ -224,6 +227,7 @@ function mwe(
     verbose::Bool = _default(:verbose),
     stacktrace::Bool = _default(:stacktrace),
     versioninfo::Bool = _default(:versioninfo),
+    julia_args::AbstractString = _default(:julia_args),
 )
     _run_mwe(
         code;
@@ -237,6 +241,7 @@ function mwe(
         verbose,
         stacktrace,
         versioninfo,
+        julia_args,
     )
 end
 
@@ -571,6 +576,7 @@ function _run_in_new_process(
     verbose::Bool = false,
     stacktrace::Bool = false,
     versioninfo::Bool = false,
+    julia_args::AbstractString = "",
 )
     mktempdir() do tmpdir
         temp && _setup_temp_env!(tmpdir, code_str, packagespecs, manifest_path; verbose)
@@ -581,7 +587,8 @@ function _run_in_new_process(
 
         julia_exe = joinpath(Sys.BINDIR, Base.julia_exename())
         project_flag = temp ? "--project=$tmpdir" : "--project=@."
-        cmd = `$julia_exe $project_flag --startup-file=no -q $script_path`
+        extra_flags = Cmd(Base.shell_split(julia_args))
+        cmd = `$julia_exe $project_flag --startup-file=no $extra_flags -q $script_path`
         temp && (
             cmd = addenv(
                 cmd,
@@ -761,11 +768,17 @@ function _run_mwe(
     verbose::Bool = _default(:verbose),
     stacktrace::Bool = _default(:stacktrace),
     versioninfo::Bool = _default(:versioninfo),
+    julia_args::AbstractString = _default(:julia_args),
 )
     venue in (:gh, :discord, :slack) ||
         error("venue must be :gh, :discord or :slack, got $(repr(venue))")
     if !isnothing(manifest_path) && !isempty(packagespecs)
         error("`manifest_path` and `packagespecs` are mutually exclusive; pass only one")
+    end
+    if !isempty(julia_args) && !newprocess
+        error(
+            "`julia_args` requires `newprocess=true`; there is no subprocess to pass flags to",
+        )
     end
     _advertise = isnothing(advertise) ? (venue !== :slack) : advertise
 
@@ -779,6 +792,7 @@ function _run_mwe(
             verbose,
             stacktrace,
             versioninfo,
+            julia_args,
         )
     else
         _run_in_current_process(
