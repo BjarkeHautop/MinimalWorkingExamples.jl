@@ -1,6 +1,6 @@
 name = "MinimalWorkingExamples"
 uuid = "1cd72250-7741-5363-ad87-1e7986b7dfb4"
-version = "0.1.1"
+version = "0.1.2-DEV"
 authors = ["Bjarke Hautop Kristensen <bjarke.hautop@gmail.com>"]
 
 [workspace]
