@@ -121,7 +121,7 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
 - `stacktrace=false`: if `true`, append the full stacktrace after the error message.
 - `versioninfo`: if `true`, append a collapsible "Environment" block showing the output of
   `versioninfo()`. Defaults to `true` for `:gh` and `false` for `:discord`/`:slack` (collapsible
-  `<details>` blocks aren't reliably rendered there); can be set explicitly to override.
+  `<details>` blocks aren't rendered there); can be set explicitly to override.
 - `julia_args=""`: extra command-line flags passed through to the isolated Julia process, e.g.
   `"-t 4"` or `"--check-bounds=no"`. Only valid when `newprocess=true`.
 

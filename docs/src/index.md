@@ -18,11 +18,17 @@ pkg> add MinimalWorkingExamples
 
 ## Basic usage
 
-Write your code in a `begin...end` block and pass it to [`@mwe`](@ref):
+The quickest way: copy your code to the clipboard, then call [`mwe()`](@ref) with no arguments:
 
 ```julia
 using MinimalWorkingExamples
 
+mwe()
+```
+
+Or write your code in a `begin...end` block and pass it to [`@mwe`](@ref) directly:
+
+```julia
 @mwe begin
     using Statistics
     x = [1, 2, 3, 4, 5]
@@ -30,7 +36,7 @@ using MinimalWorkingExamples
 end
 ```
 
-This runs the code as a script in a fresh Julia process with a clean temporary environment, copies the result to your clipboard, and prints it:
+Either way, this runs the code as a script in a fresh Julia process with a clean temporary environment, copies the result to your clipboard, and prints it:
 
 ```@raw html
 <div class="gh-output">
@@ -55,8 +61,6 @@ mean(x)
 
 The value of the last expression is shown as `#>`, as are any `print` calls and log messages (`@warn`, `@info`) in the code.
 
-For the `:gh` venue, `versioninfo=true` is actually the default, which is why the "Environment" block above is shown automatically. The other examples on this page pass `versioninfo=false` to keep their output focused — see [Including environment details](@ref) for details on controlling it.
-
 The result is returned as a [`MWEResult`](@ref), so you can access the Markdown string directly if the clipboard is unavailable:
 
 ```julia
@@ -66,19 +70,7 @@ end
 print(result.md)  # print the Markdown string
 ```
 
-[`mwe()`](@ref) is the function version of the macro. It accepts the same keyword arguments as `@mwe`.
-If `code` is omitted, it reads Julia source from the clipboard:
-
-```julia
-# Copy some Julia code to your clipboard, then:
-mwe()
-
-# Or pass a string directly:
-mwe("""
-using Statistics
-mean([1, 2, 3])
-""")
-```
+[`mwe()`](@ref) and [`@mwe`](@ref) accept the same keyword arguments.
 
 ## Venue
 
@@ -165,7 +157,7 @@ Two independent, opt-in-or-out blocks can be appended after the code:
 
 - `versioninfo`: appends the output of `versioninfo()` in a collapsible "Environment" block. Defaults to
   `true` for `:gh`, and `false` for `:discord` and
-  `:slack`, since collapsible `<details>` blocks (raw HTML) aren't reliably rendered outside
+  `:slack`, since collapsible `<details>` blocks aren't rendered outside
   GitHub-Flavored Markdown.
 - `manifest=false`: pass `manifest=true` to append the full `Manifest.toml` in a collapsible block,
   so anyone can reproduce your exact package versions. Same caveat about `<details>` rendering
@@ -176,7 +168,7 @@ Two independent, opt-in-or-out blocks can be appended after the code:
     using DataFrames
     df = DataFrame(a = 1:3, b = ["x", "y", "z"])
     df
-end manifest=true versioninfo=false
+end manifest=true
 ```
 
 ## Pinning a specific package version
@@ -219,5 +211,5 @@ Pass `manifest_path` to use an existing `Manifest.toml` as-is.
 @mwe begin
     using Example
     Example.hello("World")
-end manifest_path="/path/to/your/Manifest.toml" versioninfo=false
+end manifest_path="/path/to/your/Manifest.toml"
 ```
