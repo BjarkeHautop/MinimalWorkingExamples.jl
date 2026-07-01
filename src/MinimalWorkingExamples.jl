@@ -16,7 +16,7 @@ const _DEFAULTS = (
     advertise = nothing,
     verbose = false,
     stacktrace = false,
-    versioninfo = true,
+    versioninfo = nothing,
     julia_args = "",
 )
 
@@ -92,7 +92,7 @@ end
         code
     end [venue=:gh] [temp=true] [newprocess=true] [manifest=false] [advertise=nothing]
         [packagespecs=PackageSpec[]] [manifest_path=nothing] [verbose=false] [stacktrace=false]
-        [versioninfo=true] [julia_args=""]
+        [versioninfo=nothing] [julia_args=""]
 
 Generate a Minimal Working Example (MWE) formatted as Markdown, then copy it to the clipboard.
 
@@ -119,8 +119,9 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
 - `verbose=false`: if `true`, show Pkg output (downloads, resolver messages) during environment
   setup.
 - `stacktrace=false`: if `true`, append the full stacktrace after the error message.
-- `versioninfo=true`: if `true`, append a collapsible "Environment" block showing the output
-  of `versioninfo()`.
+- `versioninfo`: if `true`, append a collapsible "Environment" block showing the output of
+  `versioninfo()`. Defaults to `true` for `:gh` and `false` for `:discord`/`:slack` (collapsible
+  `<details>` blocks aren't reliably rendered there); can be set explicitly to override.
 - `julia_args=""`: extra command-line flags passed through to the isolated Julia process, e.g.
   `"-t 4"` or `"--check-bounds=no"`. Only valid when `newprocess=true`.
 
@@ -138,7 +139,7 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
     using Statistics
     x = [1, 2, 3, 4, 5]
     mean(x)
-end
+end versioninfo=false
 ```
 
 Produces (copied to clipboard):
@@ -189,7 +190,7 @@ end
 """
     mwe([code]; venue=:gh, temp=true, newprocess=true, manifest=false, advertise=nothing,
                packagespecs=PackageSpec[], manifest_path=nothing, verbose=false, stacktrace=false,
-               versioninfo=true, julia_args="")
+               versioninfo=nothing, julia_args="")
 
 Function form of [`@mwe`](@ref). Accepts code as a plain string.
 If `code` is omitted, reads Julia source from the clipboard.
@@ -226,7 +227,7 @@ function mwe(
     manifest_path::Union{AbstractString,Nothing} = nothing,
     verbose::Bool = _default(:verbose),
     stacktrace::Bool = _default(:stacktrace),
-    versioninfo::Bool = _default(:versioninfo),
+    versioninfo::Union{Bool,Nothing} = _default(:versioninfo),
     julia_args::AbstractString = _default(:julia_args),
 )
     _run_mwe(
@@ -768,7 +769,7 @@ function _run_mwe(
     manifest_path::Union{AbstractString,Nothing} = nothing,
     verbose::Bool = _default(:verbose),
     stacktrace::Bool = _default(:stacktrace),
-    versioninfo::Bool = _default(:versioninfo),
+    versioninfo::Union{Bool,Nothing} = _default(:versioninfo),
     julia_args::AbstractString = _default(:julia_args),
 )
     venue in (:gh, :discord, :slack) ||
@@ -782,6 +783,7 @@ function _run_mwe(
         )
     end
     _advertise = isnothing(advertise) ? (venue !== :slack) : advertise
+    _versioninfo = isnothing(versioninfo) ? (venue === :gh) : versioninfo
 
     repl_output, manifest_str, env_str = if newprocess
         _run_in_new_process(
@@ -792,7 +794,7 @@ function _run_mwe(
             manifest_path,
             verbose,
             stacktrace,
-            versioninfo,
+            versioninfo = _versioninfo,
             julia_args,
         )
     else
@@ -803,7 +805,7 @@ function _run_mwe(
             manifest_path,
             verbose,
             stacktrace,
-            versioninfo,
+            versioninfo = _versioninfo,
         )
     end
 
@@ -822,7 +824,7 @@ function _run_mwe(
         note = "Created on $(today()) with [MinimalWorkingExamples v$(pkgversion(MinimalWorkingExamples))](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia $VERSION$extra"
         md *= venue === :discord ? "\n\n-# $note" : "\n\n<sup>$note</sup>"
     end
-    if versioninfo && !isempty(env_str)
+    if _versioninfo && !isempty(env_str)
         md *= "\n\n<details>\n<summary>Environment</summary>\n\n```text\n$env_str\n```\n\n</details>"
     end
     if manifest && !isempty(manifest_str)

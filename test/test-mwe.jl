@@ -268,6 +268,59 @@ end
     @test contains(result.md, string(VERSION))
 end
 
+@testitem "venue=:gh defaults versioninfo to true" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "1 + 1";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+        venue = :gh,
+    )
+    @test contains(result.md, "<details>\n<summary>Environment</summary>")
+end
+
+@testitem "venue=:discord defaults versioninfo to false" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "1 + 1";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+        venue = :discord,
+    )
+    @test !contains(result.md, "Environment")
+end
+
+@testitem "venue=:slack defaults versioninfo to false" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "1 + 1";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+        venue = :slack,
+    )
+    @test !contains(result.md, "Environment")
+end
+
+@testitem "versioninfo=true overrides false default for :slack" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "1 + 1";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+        venue = :slack,
+        versioninfo = true,
+    )
+    @test contains(result.md, "Environment")
+end
+
 @testitem "julia_args passes flags through to the subprocess" tags=[:unit, :fast] begin
     result = MinimalWorkingExamples._run_mwe(
         "Threads.nthreads()";

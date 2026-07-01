@@ -10,8 +10,7 @@ Inspired by the R package [reprex](https://reprex.tidyverse.org/).
 
 ## Installation
 
-MinimalWorkingExamples can be installed directly from the Julia package manager. In the Julia REPL, press `]`
-to enter the Pkg mode, then run:
+MinimalWorkingExamples can be installed directly from the Julia package manager. In the Julia REPL, press `]` to enter the Pkg mode, then run:
 
 ```julia
 pkg> add MinimalWorkingExamples
@@ -46,10 +45,17 @@ mean(x)
 
 ```@raw html
 <small>Created on <date> with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v<version></a> using Julia <julia-version></small>
+
+<details>
+<summary>Environment</summary>
+<pre><mwe-versioninfo></pre>
+</details>
 </div>
 ```
 
 The value of the last expression is shown as `#>`, as are any `print` calls and log messages (`@warn`, `@info`) in the code.
+
+For the `:gh` venue, `versioninfo=true` is actually the default, which is why the "Environment" block above is shown automatically. The other examples on this page pass `versioninfo=false` to keep their output focused — see [Including environment details](@ref) for details on controlling it.
 
 The result is returned as a [`MWEResult`](@ref), so you can access the Markdown string directly if the clipboard is unavailable:
 
@@ -98,7 +104,7 @@ If the code throws an error, it is captured and shown as a `#>` comment — exec
     x = [1, 2, 3]
     x[10]
     x[1]  # never reached
-end
+end versioninfo=false
 ```
 
 Output:
@@ -125,7 +131,7 @@ Stacktrace can be included by passing `stacktrace=true`:
     x = [1, 2, 3]
     x[10]
     x[1]  # never reached
-end stacktrace=true
+end stacktrace=true versioninfo=false
 ```
 
 Output:
@@ -155,14 +161,22 @@ x[10]
 
 ## Including environment details
 
-Pass `manifest=true` to append the full `Manifest.toml` in a collapsible block, so anyone can reproduce your exact package versions:
+Two independent, opt-in-or-out blocks can be appended after the code:
+
+- `versioninfo`: appends the output of `versioninfo()` in a collapsible "Environment" block. Defaults to
+  `true` for `:gh`, and `false` for `:discord` and
+  `:slack`, since collapsible `<details>` blocks (raw HTML) aren't reliably rendered outside
+  GitHub-Flavored Markdown.
+- `manifest=false`: pass `manifest=true` to append the full `Manifest.toml` in a collapsible block,
+  so anyone can reproduce your exact package versions. Same caveat about `<details>` rendering
+  applies for `:discord`/`:slack`.
 
 ```julia
 @mwe begin
     using DataFrames
     df = DataFrame(a = 1:3, b = ["x", "y", "z"])
     df
-end manifest=true
+end manifest=true versioninfo=false
 ```
 
 ## Pinning a specific package version
@@ -175,7 +189,7 @@ using Pkg
 @mwe begin
     using Example
     Example.hello("World")
-end packagespecs=[PackageSpec(name="Example", version="0.5.3")]
+end packagespecs=[PackageSpec(name="Example", version="0.5.3")] versioninfo=false
 ```
 
 Output:
@@ -205,5 +219,5 @@ Pass `manifest_path` to use an existing `Manifest.toml` as-is.
 @mwe begin
     using Example
     Example.hello("World")
-end manifest_path="/path/to/your/Manifest.toml"
+end manifest_path="/path/to/your/Manifest.toml" versioninfo=false
 ```
