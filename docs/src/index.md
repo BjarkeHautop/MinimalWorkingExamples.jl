@@ -10,8 +10,7 @@ Inspired by the R package [reprex](https://reprex.tidyverse.org/).
 
 ## Installation
 
-MinimalWorkingExamples can be installed directly from the Julia package manager. In the Julia REPL, press `]`
-to enter the Pkg mode, then run:
+MinimalWorkingExamples can be installed directly from the Julia package manager. In the Julia REPL, press `]` to enter the Pkg mode, then run:
 
 ```julia
 pkg> add MinimalWorkingExamples
@@ -19,11 +18,17 @@ pkg> add MinimalWorkingExamples
 
 ## Basic usage
 
-Write your code in a `begin...end` block and pass it to [`@mwe`](@ref):
+The quickest way: copy your code to the clipboard, then call [`mwe()`](@ref) with no arguments:
 
 ```julia
 using MinimalWorkingExamples
 
+mwe()
+```
+
+Or write your code in a `begin...end` block and pass it to [`@mwe`](@ref) directly:
+
+```julia
 @mwe begin
     using Statistics
     x = [1, 2, 3, 4, 5]
@@ -31,7 +36,7 @@ using MinimalWorkingExamples
 end
 ```
 
-This runs the code as a script in a fresh Julia process with a clean temporary environment, copies the result to your clipboard, and prints it:
+Either way, this runs the code as a script in a fresh Julia process with a clean temporary environment, copies the result to your clipboard, and prints it:
 
 ```@raw html
 <div class="gh-output">
@@ -46,6 +51,11 @@ mean(x)
 
 ```@raw html
 <small>Created on <date> with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v<version></a> using Julia <julia-version></small>
+
+<details>
+<summary>Environment</summary>
+<pre><mwe-versioninfo></pre>
+</details>
 </div>
 ```
 
@@ -60,19 +70,7 @@ end
 print(result.md)  # print the Markdown string
 ```
 
-[`mwe()`](@ref) is the function version of the macro. It accepts the same keyword arguments as `@mwe`.
-If `code` is omitted, it reads Julia source from the clipboard:
-
-```julia
-# Copy some Julia code to your clipboard, then:
-mwe()
-
-# Or pass a string directly:
-mwe("""
-using Statistics
-mean([1, 2, 3])
-""")
-```
+[`mwe()`](@ref) and [`@mwe`](@ref) accept the same keyword arguments.
 
 ## Venue
 
@@ -98,7 +96,7 @@ If the code throws an error, it is captured and shown as a `#>` comment — exec
     x = [1, 2, 3]
     x[10]
     x[1]  # never reached
-end
+end versioninfo=false
 ```
 
 Output:
@@ -125,7 +123,7 @@ Stacktrace can be included by passing `stacktrace=true`:
     x = [1, 2, 3]
     x[10]
     x[1]  # never reached
-end stacktrace=true
+end stacktrace=true versioninfo=false
 ```
 
 Output:
@@ -155,7 +153,15 @@ x[10]
 
 ## Including environment details
 
-Pass `manifest=true` to append the full `Manifest.toml` in a collapsible block, so anyone can reproduce your exact package versions:
+Two independent, opt-in-or-out blocks can be appended after the code:
+
+- `versioninfo`: appends the output of `versioninfo()` in a collapsible "Environment" block. Defaults to
+  `true` for `:gh`, and `false` for `:discord` and
+  `:slack`, since collapsible `<details>` blocks aren't rendered outside
+  GitHub-Flavored Markdown.
+- `manifest=false`: pass `manifest=true` to append the full `Manifest.toml` in a collapsible block,
+  so anyone can reproduce your exact package versions. Same caveat about `<details>` rendering
+  applies for `:discord`/`:slack`.
 
 ```julia
 @mwe begin
@@ -175,7 +181,7 @@ using Pkg
 @mwe begin
     using Example
     Example.hello("World")
-end packagespecs=[PackageSpec(name="Example", version="0.5.3")]
+end packagespecs=[PackageSpec(name="Example", version="0.5.3")] versioninfo=false
 ```
 
 Output:

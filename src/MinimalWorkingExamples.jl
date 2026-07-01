@@ -3,7 +3,7 @@ module MinimalWorkingExamples
 using Dates: today
 using Logging
 using Pkg
-using InteractiveUtils: clipboard
+using InteractiveUtils: clipboard, versioninfo as interactive_versioninfo
 using Preferences: load_preference, set_preferences!
 
 export @mwe, MWEResult, mwe, set_defaults!
@@ -16,6 +16,8 @@ const _DEFAULTS = (
     advertise = nothing,
     verbose = false,
     stacktrace = false,
+    versioninfo = nothing,
+    julia_args = "",
 )
 
 function _default(key::Symbol)
@@ -34,9 +36,9 @@ _defaults() = (; (k => _default(k) for k in keys(_DEFAULTS))...)
 Persistently override the default keyword arguments of [`@mwe`](@ref) and
 [`mwe`](@ref) using [Preferences.jl](https://github.com/JuliaPackaging/Preferences.jl).
 
-Any of `venue`, `temp`, `newprocess`, `manifest`, `advertise`, `verbose`, and
-`stacktrace` may be set. Passing `nothing` for a key clears it, reverting to the
-built-in default.
+Any of `venue`, `temp`, `newprocess`, `manifest`, `advertise`, `verbose`,
+`stacktrace`, `versioninfo`, and `julia_args` may be set. Passing `nothing` for a key clears it,
+reverting to the built-in default.
 
 # Examples
 
@@ -90,6 +92,7 @@ end
         code
     end [venue=:gh] [temp=true] [newprocess=true] [manifest=false] [advertise=nothing]
         [packagespecs=PackageSpec[]] [manifest_path=nothing] [verbose=false] [stacktrace=false]
+        [versioninfo=nothing] [julia_args=""]
 
 Generate a Minimal Working Example (MWE) formatted as Markdown, then copy it to the clipboard.
 
@@ -116,6 +119,11 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
 - `verbose=false`: if `true`, show Pkg output (downloads, resolver messages) during environment
   setup.
 - `stacktrace=false`: if `true`, append the full stacktrace after the error message.
+- `versioninfo`: if `true`, append a collapsible "Environment" block showing the output of
+  `versioninfo()`. Defaults to `true` for `:gh` and `false` for `:discord`/`:slack` (collapsible
+  `<details>` blocks aren't rendered there); can be set explicitly to override.
+- `julia_args=""`: extra command-line flags passed through to the isolated Julia process, e.g.
+  `"-t 4"` or `"--check-bounds=no"`. Only valid when `newprocess=true`.
 
 !!! note
     Comments in the code block are not preserved in the output. Use [`mwe`](@ref) if you need to preserve comments.
@@ -131,7 +139,7 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
     using Statistics
     x = [1, 2, 3, 4, 5]
     mean(x)
-end
+end versioninfo=false
 ```
 
 Produces (copied to clipboard):
@@ -181,7 +189,8 @@ end
 
 """
     mwe([code]; venue=:gh, temp=true, newprocess=true, manifest=false, advertise=nothing,
-               packagespecs=PackageSpec[], manifest_path=nothing, verbose=false, stacktrace=false)
+               packagespecs=PackageSpec[], manifest_path=nothing, verbose=false, stacktrace=false,
+               versioninfo=nothing, julia_args="")
 
 Function form of [`@mwe`](@ref). Accepts code as a plain string.
 If `code` is omitted, reads Julia source from the clipboard.
@@ -218,6 +227,8 @@ function mwe(
     manifest_path::Union{AbstractString,Nothing} = nothing,
     verbose::Bool = _default(:verbose),
     stacktrace::Bool = _default(:stacktrace),
+    versioninfo::Union{Bool,Nothing} = _default(:versioninfo),
+    julia_args::AbstractString = _default(:julia_args),
 )
     _run_mwe(
         code;
@@ -230,6 +241,8 @@ function mwe(
         manifest_path,
         verbose,
         stacktrace,
+        versioninfo,
+        julia_args,
     )
 end
 
@@ -273,6 +286,7 @@ end
 # ── Package helpers ────────────────────────────────────────────────────────────
 
 function _is_stdlib(name::AbstractString)
+    name in ("Base", "Core", "Main") && return true
     return isdir(joinpath(Sys.STDLIB, name))
 end
 
@@ -409,7 +423,17 @@ end
 
 # ── Driver script ──────────────────────────────────────────────────────────────
 
-function _build_driver_script(code_str::AbstractString; stacktrace::Bool = false)
+function _build_driver_script(
+    code_str::AbstractString;
+    stacktrace::Bool = false,
+    versioninfo_path::Union{AbstractString,Nothing} = nothing,
+)
+    versioninfo_stmt = isnothing(versioninfo_path) ? "" : """
+    using InteractiveUtils
+    open($(repr(versioninfo_path)), "w") do _mwe_vio
+        InteractiveUtils.versioninfo(_mwe_vio)
+    end
+    """
     return """
     using Logging
 
@@ -492,6 +516,7 @@ function _build_driver_script(code_str::AbstractString; stacktrace::Bool = false
             _mwe_prefix_output(String(take!(_mwe_buf)))
         end
     end
+    $versioninfo_stmt
     """
 end
 
@@ -552,16 +577,20 @@ function _run_in_new_process(
     manifest_path::Union{AbstractString,Nothing} = nothing,
     verbose::Bool = false,
     stacktrace::Bool = false,
+    versioninfo::Bool = false,
+    julia_args::AbstractString = "",
 )
     mktempdir() do tmpdir
         temp && _setup_temp_env!(tmpdir, code_str, packagespecs, manifest_path; verbose)
 
+        versioninfo_path = versioninfo ? joinpath(tmpdir, "mwe_versioninfo.txt") : nothing
         script_path = joinpath(tmpdir, "mwe_driver.jl")
-        write(script_path, _build_driver_script(code_str; stacktrace))
+        write(script_path, _build_driver_script(code_str; stacktrace, versioninfo_path))
 
         julia_exe = joinpath(Sys.BINDIR, Base.julia_exename())
         project_flag = temp ? "--project=$tmpdir" : "--project=@."
-        cmd = `$julia_exe $project_flag --startup-file=no -q $script_path`
+        extra_flags = Cmd(Base.shell_split(julia_args))
+        cmd = `$julia_exe $project_flag --startup-file=no $extra_flags -q $script_path`
         temp && (
             cmd = addenv(
                 cmd,
@@ -582,7 +611,12 @@ function _run_in_new_process(
             isfile(mp) && (manifest_str = read(mp, String))
         end
 
-        return repl_output, manifest_str
+        env_str = ""
+        if !isnothing(versioninfo_path) && isfile(versioninfo_path)
+            env_str = rstrip(read(versioninfo_path, String), '\n')
+        end
+
+        return repl_output, manifest_str, env_str
     end
 end
 
@@ -698,7 +732,9 @@ function _run_in_current_process(
     manifest_path::Union{AbstractString,Nothing} = nothing,
     verbose::Bool = false,
     stacktrace::Bool = false,
+    versioninfo::Bool = false,
 )
+    env_str() = versioninfo ? rstrip(sprint(interactive_versioninfo), '\n') : ""
     if temp
         mktempdir() do tmpdir
             _setup_temp_env!(tmpdir, code_str, packagespecs, manifest_path; verbose)
@@ -706,7 +742,7 @@ function _run_in_current_process(
             try
                 Pkg.activate(tmpdir)
                 output = _execute_code_in_current_process(code_str; stacktrace)
-                return output, ""
+                return output, "", env_str()
             finally
                 if isnothing(original_project)
                     Pkg.activate()
@@ -716,7 +752,7 @@ function _run_in_current_process(
             end
         end
     else
-        return _execute_code_in_current_process(code_str; stacktrace), ""
+        return _execute_code_in_current_process(code_str; stacktrace), "", env_str()
     end
 end
 
@@ -733,15 +769,23 @@ function _run_mwe(
     manifest_path::Union{AbstractString,Nothing} = nothing,
     verbose::Bool = _default(:verbose),
     stacktrace::Bool = _default(:stacktrace),
+    versioninfo::Union{Bool,Nothing} = _default(:versioninfo),
+    julia_args::AbstractString = _default(:julia_args),
 )
     venue in (:gh, :discord, :slack) ||
         error("venue must be :gh, :discord or :slack, got $(repr(venue))")
     if !isnothing(manifest_path) && !isempty(packagespecs)
         error("`manifest_path` and `packagespecs` are mutually exclusive; pass only one")
     end
+    if !isempty(julia_args) && !newprocess
+        error(
+            "`julia_args` requires `newprocess=true`; there is no subprocess to pass flags to",
+        )
+    end
     _advertise = isnothing(advertise) ? (venue !== :slack) : advertise
+    _versioninfo = isnothing(versioninfo) ? (venue === :gh) : versioninfo
 
-    repl_output, manifest_str = if newprocess
+    repl_output, manifest_str, env_str = if newprocess
         _run_in_new_process(
             code_str;
             temp,
@@ -750,6 +794,8 @@ function _run_mwe(
             manifest_path,
             verbose,
             stacktrace,
+            versioninfo = _versioninfo,
+            julia_args,
         )
     else
         _run_in_current_process(
@@ -759,6 +805,7 @@ function _run_mwe(
             manifest_path,
             verbose,
             stacktrace,
+            versioninfo = _versioninfo,
         )
     end
 
@@ -776,6 +823,9 @@ function _run_mwe(
         extra = isempty(notes) ? "" : " · " * join(notes, " · ")
         note = "Created on $(today()) with [MinimalWorkingExamples v$(pkgversion(MinimalWorkingExamples))](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia $VERSION$extra"
         md *= venue === :discord ? "\n\n-# $note" : "\n\n<sup>$note</sup>"
+    end
+    if _versioninfo && !isempty(env_str)
+        md *= "\n\n<details>\n<summary>Environment</summary>\n\n```text\n$env_str\n```\n\n</details>"
     end
     if manifest && !isempty(manifest_str)
         md *= "\n\n<details>\n<summary>Manifest.toml</summary>\n\n```toml\n$manifest_str\n```\n\n</details>"

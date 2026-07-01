@@ -1,6 +1,7 @@
 using MinimalWorkingExamples
 using Documenter
 using Dates: today
+using InteractiveUtils: versioninfo
 
 DocMeta.setdocmeta!(
     MinimalWorkingExamples,
@@ -15,6 +16,17 @@ function generate_footer_html(; pinned_note = "")
     julia_version = VERSION
     extra = isempty(pinned_note) ? "" : " · $pinned_note"
     return """<small>Created on $date with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v$version</a> using Julia $julia_version$extra</small>"""
+end
+
+function escape_html(s::AbstractString)
+    return replace(s, "&" => "&amp;", "<" => "&lt;", ">" => "&gt;")
+end
+
+function generate_environment_html()
+    env_text = rstrip(sprint() do io
+        versioninfo(io)
+    end, '\n')
+    return "<pre>" * escape_html(env_text) * "</pre>"
 end
 
 function postprocess_html()
@@ -42,6 +54,11 @@ function postprocess_html()
                     content,
                     r"<small>Created on <date> with <a href=\"https://github\.com/BjarkeHautop/MinimalWorkingExamples\.jl\">MinimalWorkingExamples v<version></a> using Julia <julia-version></small>" =>
                         footer,
+                )
+
+                content = replace(
+                    content,
+                    "<pre><mwe-versioninfo></pre>" => generate_environment_html(),
                 )
 
                 write(html_path, content)

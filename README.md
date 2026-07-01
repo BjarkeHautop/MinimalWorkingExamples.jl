@@ -23,11 +23,17 @@ pkg> add MinimalWorkingExamples
 
 ## Basic usage
 
-Write your code in a `begin...end` block and pass it to `@mwe`:
+The quickest way: copy your code to the clipboard, then call `mwe()` with no arguments:
 
 ```julia
 using MinimalWorkingExamples
 
+mwe()
+```
+
+Or write your code in a `begin...end` block and pass it to `@mwe` directly:
+
+```julia
 @mwe begin
     using Statistics
     x = [1, 2, 3, 4, 5]
@@ -35,7 +41,7 @@ using MinimalWorkingExamples
 end
 ```
 
-This runs the code as a script in a fresh Julia process with a clean temporary environment, copies the result to your clipboard, and prints it:
+Either way, this runs the code as a script in a fresh Julia process with a clean temporary environment, copies the result to your clipboard, and prints it:
 
 ````markdown
 ```julia
@@ -47,13 +53,6 @@ mean(x)
 ````
 
 The value of the last expression is shown as `#>`, as are any `print` calls and log messages (`@warn`, `@info`) in the code.
-
-`mwe` is the function version of the macro. If the first argument is not given, code is read from the clipboard:
-
-```julia
-# Run code from clipboard
-mwe()
-```
 
 ## Contributing
 
