@@ -27,15 +27,18 @@ const _JULIA_KEYWORDS = Set([
     "where", "while",
 ])
 
-# One line of Julia at a time: strings, comments, macros, numbers, identifiers,
-# then any other single character. Line-based, so triple-quoted strings spanning
-# lines are highlighted only approximately — fine for a preview.
-const _HL_TOKEN_RE = r"\"(?:\\.|[^\"\\])*\"|#.*$|@[A-Za-z_]\w*|\d+(?:\.\d+)?(?:[eEf][+-]?\d+)?|[A-Za-z_]\w*!?|."
+# One line of Julia at a time: strings, comments, macros, symbols, numbers,
+# identifiers, then any other single character. Line-based, so triple-quoted
+# strings spanning lines are highlighted only approximately — fine for a preview.
+# The symbol alternative excludes a `:` preceded by a word char or another `:`,
+# so type annotations (`x::Int`) and ranges (`1:n`) aren't mistaken for `:name`.
+const _HL_TOKEN_RE = r"\"(?:\\.|[^\"\\])*\"|#.*$|@[A-Za-z_]\w*|(?<![\w:]):[A-Za-z_]\w*!?|\d+(?:\.\d+)?(?:[eEf][+-]?\d+)?|[A-Za-z_]\w*!?|."
 
 function _token_class(tok::AbstractString)
     startswith(tok, '#') && return "hl-c"
     startswith(tok, '"') && return "hl-s"
     startswith(tok, '@') && return "hl-m"
+    startswith(tok, ':') && length(tok) > 1 && return "hl-y"
     occursin(r"^\d", tok) && return "hl-n"
     tok in _JULIA_KEYWORDS && return "hl-k"
     return ""
@@ -77,6 +80,7 @@ summary { cursor: pointer; }
 .hl-c { color: #59636e; }
 .hl-n { color: #0550ae; }
 .hl-m { color: #8250df; }
+.hl-y { color: #116329; }
 .hl-out { color: #59636e; }
 @media (prefers-color-scheme: dark) {
     body { color: #e6edf3; background: #0d1117; }
@@ -87,6 +91,7 @@ summary { cursor: pointer; }
     .hl-c { color: #8b949e; }
     .hl-n { color: #79c0ff; }
     .hl-m { color: #d2a8ff; }
+    .hl-y { color: #7ee787; }
     .hl-out { color: #8b949e; }
 }
 """
@@ -111,6 +116,7 @@ summary { cursor: pointer; }
 .hl-c { color: #59636e; }
 .hl-n { color: #0550ae; }
 .hl-m { color: #8250df; }
+.hl-y { color: #116329; }
 .hl-out { color: #59636e; }
 @media (prefers-color-scheme: dark) {
     .hl-k { color: #ff7b72; }
@@ -118,6 +124,7 @@ summary { cursor: pointer; }
     .hl-c { color: #8b949e; }
     .hl-n { color: #79c0ff; }
     .hl-m { color: #d2a8ff; }
+    .hl-y { color: #7ee787; }
     .hl-out { color: #8b949e; }
 }
 """
