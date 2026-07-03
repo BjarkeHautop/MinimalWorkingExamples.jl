@@ -20,11 +20,44 @@ function _md_inline(s::AbstractString)
 end
 
 const _JULIA_KEYWORDS = Set([
-    "abstract", "baremodule", "begin", "break", "catch", "const", "continue", "do",
-    "else", "elseif", "end", "export", "false", "finally", "for", "function", "global",
-    "if", "import", "in", "isa", "let", "local", "macro", "missing", "module", "mutable",
-    "nothing", "primitive", "quote", "return", "struct", "true", "try", "type", "using",
-    "where", "while",
+    "abstract",
+    "baremodule",
+    "begin",
+    "break",
+    "catch",
+    "const",
+    "continue",
+    "do",
+    "else",
+    "elseif",
+    "end",
+    "export",
+    "false",
+    "finally",
+    "for",
+    "function",
+    "global",
+    "if",
+    "import",
+    "in",
+    "isa",
+    "let",
+    "local",
+    "macro",
+    "missing",
+    "module",
+    "mutable",
+    "nothing",
+    "primitive",
+    "quote",
+    "return",
+    "struct",
+    "true",
+    "try",
+    "type",
+    "using",
+    "where",
+    "while",
 ])
 
 # One line of Julia at a time: strings, comments, macros, symbols, numbers,
@@ -32,7 +65,8 @@ const _JULIA_KEYWORDS = Set([
 # strings spanning lines are highlighted only approximately — fine for a preview.
 # The symbol alternative excludes a `:` preceded by a word char or another `:`,
 # so type annotations (`x::Int`) and ranges (`1:n`) aren't mistaken for `:name`.
-const _HL_TOKEN_RE = r"\"(?:\\.|[^\"\\])*\"|#.*$|@[A-Za-z_]\w*|(?<![\w:]):[A-Za-z_]\w*!?|\d+(?:\.\d+)?(?:[eEf][+-]?\d+)?|[A-Za-z_]\w*!?|."
+const _HL_TOKEN_RE =
+    r"\"(?:\\.|[^\"\\])*\"|#.*$|@[A-Za-z_]\w*|(?<![\w:]):[A-Za-z_]\w*!?|\d+(?:\.\d+)?(?:[eEf][+-]?\d+)?|[A-Za-z_]\w*!?|."
 
 function _token_class(tok::AbstractString)
     startswith(tok, '#') && return "hl-c"
@@ -219,8 +253,11 @@ struct _HTMLPreview
     html::String
 end
 
-Base.show(io::IO, ::MIME{Symbol("application/vnd.julia-vscode.custompane+html")}, h::_HTMLPreview) =
-    print(io, h.html)
+Base.show(
+    io::IO,
+    ::MIME{Symbol("application/vnd.julia-vscode.custompane+html")},
+    h::_HTMLPreview,
+) = print(io, h.html)
 
 # Shows `html` in the Julia VS Code extension's viewer panel
 function _display_in_editor_panel(html::AbstractString)
@@ -229,7 +266,9 @@ function _display_in_editor_panel(html::AbstractString)
     isdefined(vs, :InlineDisplay) || return false
     try
         d = Base.invokelatest(vs.InlineDisplay)
-        mime = MIME("application/vnd.julia-vscode.custompane+html;id=mwe-preview;title=\"MWE preview\"")
+        mime = MIME(
+            "application/vnd.julia-vscode.custompane+html;id=mwe-preview;title=\"MWE preview\"",
+        )
         Base.invokelatest(display, d, mime, _HTMLPreview(html))
         return true
     catch
