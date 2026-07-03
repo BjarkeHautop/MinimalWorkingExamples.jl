@@ -2,6 +2,9 @@ using MinimalWorkingExamples
 using Documenter
 using Dates: today
 using InteractiveUtils: versioninfo
+using Plots
+using RDatasets
+using StatsPlots
 
 DocMeta.setdocmeta!(
     MinimalWorkingExamples,
@@ -29,8 +32,50 @@ function generate_environment_html()
     return "<pre>" * escape_html(env_text) * "</pre>"
 end
 
+# Kept in sync with the "Plots" section of index.md: same code, so the placeholder
+# `generate_plot_example_png` swaps out below is the one this example actually produces.
+const PLOT_EXAMPLE_CODE = """
+using Plots
+using RDatasets
+using StatsPlots  # loads the `@df` recipe for DataFrames
+
+iris = dataset("datasets", "iris")
+
+@df iris scatter(
+    :SepalLength,
+    :SepalWidth,
+    group = :Species,
+    title = "My awesome plot",
+    xlabel = "Length",
+    ylabel = "Width",
+    m = (0.5, [:cross :hex :star7], 12),
+    bg = RGB(0.2, 0.2, 0.2),
+)
+"""
+
+# Actually runs the Plots example and saves the resulting PNG into the build's assets
+# directory, so `postprocess_html` can swap it in for the `MWEPLOTPLACEHOLDER` marker
+# in index.md.
+function generate_plot_example_png()
+    dest = joinpath(@__DIR__, "build", "assets", "plot-example.png")
+    mktempdir() do tmpdir
+        mwe(
+            PLOT_EXAMPLE_CODE;
+            newprocess = false,
+            temp = false,
+            versioninfo = false,
+            plot_dir = tmpdir,
+            preview = false,
+        )
+        cp(joinpath(tmpdir, "plot-1.png"), dest; force = true)
+    end
+    return nothing
+end
+
 function postprocess_html()
     build_dir = joinpath(@__DIR__, "build")
+
+    generate_plot_example_png()
 
     # Update all HTML files in the build directory
     for (root, dirs, files) in walkdir(build_dir)
@@ -59,6 +104,11 @@ function postprocess_html()
                 content = replace(
                     content,
                     "<pre><mwe-versioninfo></pre>" => generate_environment_html(),
+                )
+
+                content = replace(
+                    content,
+                    "<p>MWEPLOTPLACEHOLDER</p>" => "<p><img src=\"assets/plot-example.png\" alt=\"plot\" style=\"max-width: 100%;\"></p>",
                 )
 
                 write(html_path, content)

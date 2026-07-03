@@ -17,4 +17,5 @@ Pages = ["95-reference.md"]
 mwe
 MWEResult
 set_defaults!
+preview
 ```

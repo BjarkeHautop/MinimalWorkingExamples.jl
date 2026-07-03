@@ -36,6 +36,10 @@ Or write your code in a `begin...end` block and pass it to [`@mwe`](@ref) direct
 end
 ```
 
+!!! note
+
+    Generally [`mwe()`](@ref) is the better choice: it preserves your code's exact formatting and comments, and all you need to do is copy the code and call it. [`@mwe`](@ref) strips comments and requires a `begin...end` block, but is more convenient to show inline, so most examples in this documentation use it.
+
 Either way, this runs the code as a script in a fresh Julia process with a clean temporary environment, copies the result to your clipboard, and prints it:
 
 ```@raw html
@@ -148,6 +152,53 @@ x[10]
 
 ```@raw html
 <small>Created on <date> with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v<version></a> using Julia <julia-version></small>
+</div>
+```
+
+## Plots
+
+Any plot produced while running the code is saved as a PNG file and replaced in the Markdown with a
+`**Insert plot here: <path>**` placeholder at the position it was produced. Files land in the
+`plot_dir` directory (default `MWEPlots/`, created next to your working directory); upload them
+alongside the generated Markdown.
+
+Copy the following code, taken from the [Plots.jl documentation](https://docs.juliaplots.org/stable/#), and call `mwe()` on it; this is the output:
+
+```@raw html
+<div class="gh-output">
+```
+
+```julia
+# load a dataset
+using RDatasets
+iris = dataset("datasets", "iris");
+
+# load the StatsPlots recipes (for DataFrames) available via:
+# Pkg.add("StatsPlots")
+using StatsPlots
+
+# Scatter plot with some custom settings
+@df iris scatter(
+    :SepalLength,
+    :SepalWidth,
+    group = :Species,
+    title = "My awesome plot",
+    xlabel = "Length",
+    ylabel = "Width",
+    m = (0.5, [:cross :hex :star7], 12),
+    bg = RGB(0.2, 0.2, 0.2)
+)
+```
+
+MWEPLOTPLACEHOLDER
+
+```@raw html
+<small>Created on <date> with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v<version></a> using Julia <julia-version></small>
+
+<details>
+<summary>Environment</summary>
+<pre><mwe-versioninfo></pre>
+</details>
 </div>
 ```
 

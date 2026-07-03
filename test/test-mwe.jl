@@ -784,6 +784,191 @@ end
     @test contains(result.md, "current environment")
 end
 
+# ── plot capture ──────────────────────────────────────────────────────────────
+
+@testitem "plots: image link inserted at plot position (in-process)" tags=[:unit, :fast] begin
+    dir = mktempdir()
+    code = """
+    struct FakePlotA end
+    Base.show(io::IO, ::MIME"image/png", ::FakePlotA) = write(io, UInt8[0x89, 0x50, 0x4E, 0x47])
+    1 + 1
+    FakePlotA()
+    2 + 2
+    """
+    result = MinimalWorkingExamples._run_mwe(
+        code;
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        versioninfo = false,
+        plot_dir = dir,
+    )
+    path = joinpath(dir, "plot-1.png")
+    @test isfile(path)
+    @test read(path) == UInt8[0x89, 0x50, 0x4E, 0x47]
+    link = replace(path, '\\' => '/')
+    @test contains(
+        result.md,
+        "FakePlotA()\n```\n\n**Insert plot here: $link**\n\n```julia\n2 + 2",
+    )
+    @test contains(result.md, "#> 4")
+    @test !contains(result.md, "__MWE_PLOT__")
+end
+
+@testitem "plots: explicit display() captured at position (in-process)" tags=[:unit, :fast] begin
+    dir = mktempdir()
+    code = """
+    struct FakePlotB end
+    Base.show(io::IO, ::MIME"image/png", ::FakePlotB) = write(io, UInt8[0x01])
+    display(FakePlotB())
+    2 + 2
+    """
+    result = MinimalWorkingExamples._run_mwe(
+        code;
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        versioninfo = false,
+        plot_dir = dir,
+    )
+    path = joinpath(dir, "plot-1.png")
+    @test isfile(path)
+    link = replace(path, '\\' => '/')
+    @test contains(
+        result.md,
+        "display(FakePlotB())\n```\n\n**Insert plot here: $link**\n\n```julia\n2 + 2",
+    )
+end
+
+@testitem "plots: trailing semicolon suppresses capture" tags=[:unit, :fast] begin
+    dir = mktempdir()
+    code = """
+    struct FakePlotC end
+    Base.show(io::IO, ::MIME"image/png", ::FakePlotC) = write(io, UInt8[0x01])
+    p = FakePlotC();
+    2 + 2
+    """
+    result = MinimalWorkingExamples._run_mwe(
+        code;
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        versioninfo = false,
+        plot_dir = dir,
+    )
+    @test isempty(readdir(dir))
+    @test !contains(result.md, "Insert plot here")
+    @test contains(result.md, "#> 4")
+end
+
+@testitem "plots: final plot value shows image instead of text repr" tags=[:unit, :fast] begin
+    dir = mktempdir()
+    code = """
+    struct FakePlotD end
+    Base.show(io::IO, ::MIME"image/png", ::FakePlotD) = write(io, UInt8[0x01])
+    FakePlotD()
+    """
+    result = MinimalWorkingExamples._run_mwe(
+        code;
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        versioninfo = false,
+        plot_dir = dir,
+    )
+    path = joinpath(dir, "plot-1.png")
+    @test isfile(path)
+    @test !contains(result.md, "#> FakePlotD()")
+    link = replace(path, '\\' => '/')
+    @test endswith(rstrip(result.md), "**Insert plot here: $link**")
+end
+
+@testitem "_HTMLPreview: shows raw html for the custom-pane MIME type" tags=[:unit, :fast] begin
+    using MinimalWorkingExamples: _HTMLPreview
+
+    h = _HTMLPreview("<b>hi</b>")
+    io = IOBuffer()
+    show(io, MIME("application/vnd.julia-vscode.custompane+html"), h)
+    @test String(take!(io)) == "<b>hi</b>"
+end
+
+@testitem "_display_in_editor_panel: false without an editor display backend" tags=[
+    :unit,
+    :fast,
+] begin
+    using MinimalWorkingExamples: _display_in_editor_panel
+
+    @test !isdefined(Main, :VSCodeServer)
+    @test _display_in_editor_panel("<p>hi</p>") == false
+end
+
+@testitem "preview: renders code fences and swaps placeholders for images" tags=[
+    :unit,
+    :fast,
+] begin
+    dir = mktempdir()
+    code = """
+    struct FakePlotF end
+    Base.show(io::IO, ::MIME"image/png", ::FakePlotF) = write(io, UInt8[0x01])
+    println("hello <world>")
+    FakePlotF()
+    2 + 2
+    """
+    result = MinimalWorkingExamples._run_mwe(
+        code;
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = true,
+        versioninfo = false,
+        plot_dir = dir,
+    )
+    html = MinimalWorkingExamples._md_to_preview_html(result.md)
+    @test contains(html, "<pre><code>")
+    @test contains(html, "#&gt; hello &lt;world&gt;")           # escaped output
+    @test contains(html, "<span class=\"hl-k\">struct</span>")  # syntax highlighting
+    @test !contains(html, "Insert plot here")                   # placeholder swapped
+    expected_src = MinimalWorkingExamples._file_url(joinpath(dir, "plot-1.png"))
+    @test contains(html, "<img src=\"$expected_src\"")
+    @test contains(
+        html,
+        "<a href=\"https://github.com/BjarkeHautop/MinimalWorkingExamples.jl\">",
+    )
+end
+
+@testitem "plots: capture works in subprocess (newprocess=true)" tags=[:integration, :slow] begin
+    dir = mktempdir()
+    code = """
+    struct FakePlotG end
+    Base.show(io::IO, ::MIME"image/png", ::FakePlotG) = write(io, UInt8[0x89, 0x50])
+    1 + 1
+    FakePlotG()
+    2 + 2
+    """
+    result = MinimalWorkingExamples._run_mwe(
+        code;
+        temp = false,
+        newprocess = true,
+        manifest = false,
+        advertise = false,
+        versioninfo = false,
+        plot_dir = dir,
+    )
+    path = joinpath(dir, "plot-1.png")
+    @test isfile(path)
+    @test read(path) == UInt8[0x89, 0x50]
+    link = replace(path, '\\' => '/')
+    @test contains(
+        result.md,
+        "FakePlotG()\n```\n\n**Insert plot here: $link**\n\n```julia\n2 + 2",
+    )
+    @test contains(result.md, "#> 4")
+end
+
 # Configurable defaults
 
 @testitem "defaults reflects built-in fallbacks" tags=[:unit, :fast] begin
