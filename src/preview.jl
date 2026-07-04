@@ -65,16 +65,24 @@ const _JULIA_KEYWORDS = Set([
 # strings spanning lines are highlighted only approximately — fine for a preview.
 # The symbol alternative excludes a `:` preceded by a word char or another `:`,
 # so type annotations (`x::Int`) and ranges (`1:n`) aren't mistaken for `:name`.
+# The `=` alternative excludes one adjacent to `=`, `!`, `<`, `>` so comparison
+# operators (`==`, `!=`, `<=`, `>=`) and pair arrows (`=>`) fall through to the
+# plain single-character case instead of being styled as assignment.
 const _HL_TOKEN_RE =
-    r"\"(?:\\.|[^\"\\])*\"|#.*$|@[A-Za-z_]\w*|(?<![\w:]):[A-Za-z_]\w*!?|\d+(?:\.\d+)?(?:[eEf][+-]?\d+)?|[A-Za-z_]\w*!?|."
+    r"\"(?:\\.|[^\"\\])*\"|#.*$|@[A-Za-z_]\w*|(?<![\w:]):[A-Za-z_]\w*!?|\d+(?:\.\d+)?(?:[eEf][+-]?\d+)?|[A-Za-z_]\w*!?|(?<![=!<>])=(?![=>])|."
 
-function _token_class(tok::AbstractString)
+const _HL_IDENTIFIER_RE = r"^[A-Za-z_]\w*!?$"
+
+function _token_class(tok::AbstractString, next_char::Union{Char,Nothing})
     startswith(tok, '#') && return "hl-c"
     startswith(tok, '"') && return "hl-s"
     startswith(tok, '@') && return "hl-m"
     startswith(tok, ':') && length(tok) > 1 && return "hl-y"
     occursin(r"^\d", tok) && return "hl-n"
     tok in _JULIA_KEYWORDS && return "hl-k"
+    tok == "=" && return "hl-o"
+    # An identifier directly followed by `(` is a function call or definition.
+    next_char === '(' && occursin(_HL_IDENTIFIER_RE, tok) && return "hl-f"
     return ""
 end
 
@@ -84,7 +92,9 @@ function _highlight_julia_line(line::AbstractString)
         return "<span class=\"hl-out\">" * _escape_html(line) * "</span>"
     out = IOBuffer()
     for m in eachmatch(_HL_TOKEN_RE, line)
-        cls = _token_class(m.match)
+        next_idx = m.offset + ncodeunits(m.match)
+        next_char = next_idx <= ncodeunits(line) ? line[next_idx] : nothing
+        cls = _token_class(m.match, next_char)
         esc = _escape_html(m.match)
         isempty(cls) ? print(out, esc) :
         print(out, "<span class=\"", cls, "\">", esc, "</span>")
@@ -109,23 +119,19 @@ img { max-width: 100%; }
 sup { color: #59636e; }
 details { margin: 1em 0; }
 summary { cursor: pointer; }
-.hl-k { color: #cf222e; }
+.hl-k, .hl-o { color: #cf222e; }
 .hl-s { color: #0a3069; }
 .hl-c { color: #59636e; }
-.hl-n { color: #0550ae; }
-.hl-m { color: #8250df; }
-.hl-y { color: #116329; }
+.hl-n, .hl-m, .hl-y, .hl-f { color: #0550ae; }
 .hl-out { color: #59636e; }
 @media (prefers-color-scheme: dark) {
     body { color: #e6edf3; background: #0d1117; }
     pre { background: #161b22; }
     sup { color: #8b949e; }
-    .hl-k { color: #ff7b72; }
+    .hl-k, .hl-o { color: #ff7b72; }
     .hl-s { color: #a5d6ff; }
     .hl-c { color: #8b949e; }
-    .hl-n { color: #79c0ff; }
-    .hl-m { color: #d2a8ff; }
-    .hl-y { color: #7ee787; }
+    .hl-n, .hl-m, .hl-y, .hl-f { color: #79c0ff; }
     .hl-out { color: #8b949e; }
 }
 """
@@ -145,20 +151,16 @@ img { max-width: 100%; }
 sup { color: var(--vscode-descriptionForeground, #59636e); }
 details { margin: 1em 0; }
 summary { cursor: pointer; }
-.hl-k { color: #cf222e; }
+.hl-k, .hl-o { color: #cf222e; }
 .hl-s { color: #0a3069; }
 .hl-c { color: #59636e; }
-.hl-n { color: #0550ae; }
-.hl-m { color: #8250df; }
-.hl-y { color: #116329; }
+.hl-n, .hl-m, .hl-y, .hl-f { color: #0550ae; }
 .hl-out { color: #59636e; }
 @media (prefers-color-scheme: dark) {
-    .hl-k { color: #ff7b72; }
+    .hl-k, .hl-o { color: #ff7b72; }
     .hl-s { color: #a5d6ff; }
     .hl-c { color: #8b949e; }
-    .hl-n { color: #79c0ff; }
-    .hl-m { color: #d2a8ff; }
-    .hl-y { color: #7ee787; }
+    .hl-n, .hl-m, .hl-y, .hl-f { color: #79c0ff; }
     .hl-out { color: #8b949e; }
 }
 """
