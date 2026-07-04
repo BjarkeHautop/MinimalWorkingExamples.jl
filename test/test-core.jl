@@ -784,7 +784,32 @@ end
     @test contains(result.md, "current environment")
 end
 
-# Configurable defaults
+# ── preview target resolution ─────────────────────────────────────────────────
+
+@testitem "_resolve_preview_target: validates and resolves the preview kwarg" tags=[
+    :unit,
+    :fast,
+] begin
+    using MinimalWorkingExamples: _resolve_preview_target
+
+    @test _resolve_preview_target(false) == false
+    @test _resolve_preview_target(:editor) == :editor
+    @test _resolve_preview_target(:browser) == :browser
+    @test_throws ArgumentError _resolve_preview_target(:bogus)
+
+    @test _resolve_preview_target(nothing) == false  # non-interactive default
+
+    @test !isdefined(Main, :VSCodeServer)
+    old = Base.is_interactive
+    Base.is_interactive = true
+    try
+        @test _resolve_preview_target(nothing) == :browser
+    finally
+        Base.is_interactive = old
+    end
+end
+
+# ── Configurable defaults ──────────────────────────────────────────────────────
 
 @testitem "defaults reflects built-in fallbacks" tags=[:unit, :fast] begin
     using MinimalWorkingExamples: _DEFAULTS, _defaults
@@ -799,11 +824,11 @@ end
 end
 
 @testitem "set_defaults! overrides defaults and clears back" tags=[:unit, :fast] begin
-    # Preferences.jl always leaves a LocalPreferences.toml behind (even a "cleared"
-    # preference is recorded, not deleted), so remove it if this test is what created it.
-    prefs_path = joinpath(dirname(Base.active_project()), "LocalPreferences.toml")
-    existed_before = isfile(prefs_path)
-    try
+    using Pkg
+
+    mktempdir() do dir
+        Pkg.activate(dir; io = devnull)
+
         set_defaults!(venue = :slack, temp = false)
         @test MinimalWorkingExamples._defaults().venue == :slack
         @test MinimalWorkingExamples._defaults().temp == false
@@ -813,10 +838,9 @@ end
 
         r2 = mwe("1 + 1"; venue = :gh, newprocess = false, temp = false, advertise = false)
         @test contains(r2.md, "```julia")
-    finally
+
         set_defaults!(venue = nothing, temp = nothing)
-        existed_before || rm(prefs_path; force = true)
+        @test MinimalWorkingExamples._defaults().venue == :gh
+        @test MinimalWorkingExamples._defaults().temp == true
     end
-    @test MinimalWorkingExamples._defaults().venue == :gh
-    @test MinimalWorkingExamples._defaults().temp == true
 end

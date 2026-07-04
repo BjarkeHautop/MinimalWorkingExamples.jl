@@ -1,12 +1,13 @@
 module MinimalWorkingExamples
 
+using Base64: base64encode
 using Dates: today
 using Logging
 using Pkg
 using InteractiveUtils: clipboard, versioninfo as interactive_versioninfo
 using Preferences: load_preference, set_preferences!
 
-export @mwe, MWEResult, mwe, set_defaults!
+export @mwe, MWEResult, mwe, preview, set_defaults!
 
 const _DEFAULTS = (
     venue = :gh,
@@ -18,6 +19,8 @@ const _DEFAULTS = (
     stacktrace = false,
     versioninfo = nothing,
     julia_args = "",
+    plot_dir = "MWEPlots",
+    preview = nothing,
 )
 
 function _default(key::Symbol)
@@ -25,7 +28,26 @@ function _default(key::Symbol)
     stored = load_preference(MinimalWorkingExamples, String(key))
     isnothing(stored) && return _DEFAULTS[key]
     key === :venue && return Symbol(stored)
+    key === :preview && stored isa AbstractString && return Symbol(stored)
     return stored
+end
+
+function _validate_preview(v)
+    (v === false || v === nothing || v === :editor || v === :browser) || throw(
+        ArgumentError(
+            "preview must be :editor, :browser, false, or nothing, got $(repr(v))",
+        ),
+    )
+end
+
+# `nothing` auto-detects: off when non-interactive, otherwise the editor viewer panel
+# (see `_display_in_editor_panel`) if one is available, else the browser.
+function _resolve_preview_target(preview::Union{Bool,Symbol,Nothing})
+    _validate_preview(preview)
+    preview === false && return false
+    preview isa Symbol && return preview
+    isinteractive() || return false
+    return isdefined(Main, :VSCodeServer) ? :editor : :browser
 end
 
 _defaults() = (; (k => _default(k) for k in keys(_DEFAULTS))...)
@@ -37,8 +59,8 @@ Persistently override the default keyword arguments of [`@mwe`](@ref) and
 [`mwe`](@ref) using [Preferences.jl](https://github.com/JuliaPackaging/Preferences.jl).
 
 Any of `venue`, `temp`, `newprocess`, `manifest`, `advertise`, `verbose`,
-`stacktrace`, `versioninfo`, and `julia_args` may be set. Passing `nothing` for a key clears it,
-reverting to the built-in default.
+`stacktrace`, `versioninfo`, `julia_args`, `plot_dir`, and `preview` may be set.
+Passing `nothing` for a key clears it, reverting to the built-in default.
 
 # Examples
 
@@ -76,6 +98,10 @@ function set_defaults!(; kwargs...)
 
             push!(prefs, String(k) => String(v))
 
+        elseif k === :preview
+            _validate_preview(v)
+            push!(prefs, String(k) => v isa Symbol ? String(v) : v)
+
         else
             push!(prefs, String(k) => v)
         end
@@ -90,9 +116,10 @@ end
 """
     @mwe begin
         code
-    end [venue=:gh] [temp=true] [newprocess=true] [manifest=false] [advertise=nothing]
-        [packagespecs=PackageSpec[]] [manifest_path=nothing] [verbose=false] [stacktrace=false]
-        [versioninfo=nothing] [julia_args=""]
+    end [venue=:gh] [temp=true] [newprocess=true] [manifest=false]
+        [advertise=nothing] [versioninfo=nothing] [preview=nothing]
+        [packagespecs=PackageSpec[]] [manifest_path=nothing] [verbose=false]
+        [stacktrace=false] [julia_args=""] [plot_dir="MWEPlots"]
 
 Generate a Minimal Working Example (MWE) formatted as Markdown, then copy it to the clipboard.
 
@@ -110,8 +137,14 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
   reproducibility. If `newprocess=false`, the MWE runs in the current session. If also `temp=true`,
   a temporary project is activated for the execution and then restored.
 - `manifest=false`: append the `Manifest.toml` in a collapsible `<details>` block.
-- `advertise`: append a footer noting the date, this package, and Julia version used.
-  Defaults to `false` for `:slack` and `true` otherwise; can be set explicitly to override.
+- `advertise=nothing`: append a footer noting the date, this package, and Julia version used.
+  If `nothing` (the default), this is `false` for `:slack` and `true` otherwise.
+- `versioninfo=nothing`: whether to append a collapsible "Environment" block showing the output
+  of `versioninfo()`. If `nothing` (the default), this is `true` for `:gh` and `false` otherwise.
+- `preview=nothing`: which viewer shows the rendered result (see [`preview`](@ref)) —
+  `:editor` (the host editor's viewer panel), `:browser`, or `false` (don't preview). If
+  `nothing` (the default), this is `false` in non-interactive sessions, otherwise `:editor`
+  when an editor viewer panel is available and `:browser` otherwise.
 - `packagespecs=PackageSpec[]`: vector of [`Pkg.PackageSpec`](https://pkgdocs.julialang.org/v1/api/#Pkg.PackageSpec)s for packages that need a specific
   version, git revision, URL, or local path.
 - `manifest_path=nothing`: path to an existing `Manifest.toml` to use as-is.
@@ -119,14 +152,16 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
 - `verbose=false`: if `true`, show Pkg output (downloads, resolver messages) during environment
   setup.
 - `stacktrace=false`: if `true`, append the full stacktrace after the error message.
-- `versioninfo`: if `true`, append a collapsible "Environment" block showing the output of
-  `versioninfo()`. Defaults to `true` for `:gh` and `false` for `:discord`/`:slack` (collapsible
-  `<details>` blocks aren't rendered there); can be set explicitly to override.
 - `julia_args=""`: extra command-line flags passed through to the isolated Julia process, e.g.
   `"-t 4"` or `"--check-bounds=no"`. Only valid when `newprocess=true`.
+- `plot_dir="MWEPlots"`: directory in which plots produced by the code are saved as PNGs.
+  A visible `**Insert plot here: ...**` placeholder marks each plot's position in the Markdown.
+  End a line with `;` to suppress capture for that expression.
 
 !!! note
-    Comments in the code block are not preserved in the output. Use [`mwe`](@ref) if you need to preserve comments.
+    The code block is rebuilt from its parsed AST, so comments and exact formatting are not
+    preserved in the output. Use [`mwe`](@ref) if you need to preserve your code's formatting
+    and comments.
 
 !!! tip
     The defaults above (except `packagespecs` and `manifest_path`) can be changed
@@ -188,12 +223,14 @@ macro mwe(ex, kwargs...)
 end
 
 """
-    mwe([code]; venue=:gh, temp=true, newprocess=true, manifest=false, advertise=nothing,
-               packagespecs=PackageSpec[], manifest_path=nothing, verbose=false, stacktrace=false,
-               versioninfo=nothing, julia_args="")
+    mwe([code]; kwargs...)
 
 Function form of [`@mwe`](@ref). Accepts code as a plain string.
 If `code` is omitted, reads Julia source from the clipboard.
+
+# Keyword arguments
+
+Accepts the same keyword arguments (with the same defaults) as [`@mwe`](@ref).
 
 # Examples
 
@@ -229,6 +266,8 @@ function mwe(
     stacktrace::Bool = _default(:stacktrace),
     versioninfo::Union{Bool,Nothing} = _default(:versioninfo),
     julia_args::AbstractString = _default(:julia_args),
+    plot_dir::AbstractString = _default(:plot_dir),
+    preview::Union{Bool,Symbol,Nothing} = _default(:preview),
 )
     _run_mwe(
         code;
@@ -243,14 +282,16 @@ function mwe(
         stacktrace,
         versioninfo,
         julia_args,
+        plot_dir,
+        preview,
     )
 end
 
 """
     MWEResult
 
-Wraps the Markdown string produced by `@mwe`. Displays silently in the REPL
-(the output is already printed on creation); access the Markdown string via `.md`.
+Wraps the Markdown string produced by `@mwe`. Displays silently in the REPL —
+access the Markdown string via `.md`.
 """
 struct MWEResult
     md::String
@@ -421,18 +462,118 @@ function _describe_packagespec(spec::Pkg.PackageSpec)
     end
 end
 
+# ── Plot capture ───────────────────────────────────────────────────────────────
+
+const _PLOT_MARKER = "__MWE_PLOT__:"
+
+struct _PlotSink <: Base.AbstractDisplay
+    save::Function
+end
+Base.displayable(::_PlotSink, ::MIME"image/png") = true
+function Base.display(d::_PlotSink, x)
+    showable(MIME("image/png"), x) || throw(MethodError(Base.display, (d, x)))
+    d.save(x)
+    return nothing
+end
+Base.display(d::_PlotSink, ::MIME"image/png", x) = (d.save(x); nothing)
+
+_plot_placeholder(path::AbstractString) = "**Insert plot here: $path**"
+const _PLOT_PLACEHOLDER_RE = r"^\*\*Insert plot here: (.+)\*\*$"
+
+# Flush the current run of non-plot output lines into `blocks` as a fenced code
+# block, then clear `seg_lines` for the next run. Hoisted out of `_assemble_body`
+# (rather than a nested closure) since jetls's inference gets confused by
+# `rstrip(join(...))` chains inside locally-defined functions.
+function _flush_segment!(
+    blocks::Vector{String},
+    seg_lines::Vector{String},
+    lang::AbstractString,
+)
+    seg = rstrip(join(seg_lines, '\n'))
+    isempty(seg) || push!(blocks, "```$lang\n$seg\n```")
+    empty!(seg_lines)
+    return nothing
+end
+
+# Split the captured output at plot markers so each plot becomes a visible
+# placeholder between code fences, at the position where it was produced.
+function _assemble_body(repl_output::AbstractString, lang::AbstractString)
+    blocks = String[]
+    plot_paths = String[]
+    seg_lines = String[]
+    for line in eachsplit(repl_output, '\n')
+        if startswith(line, _PLOT_MARKER)
+            path = String(chopprefix(line, _PLOT_MARKER))
+            push!(plot_paths, path)
+            _flush_segment!(blocks, seg_lines, lang)
+            push!(blocks, _plot_placeholder(replace(path, '\\' => '/')))
+        else
+            push!(seg_lines, String(line))
+        end
+    end
+    _flush_segment!(blocks, seg_lines, lang)
+    isempty(blocks) && return "```$lang\n$repl_output\n```", plot_paths
+    return join(blocks, "\n\n"), plot_paths
+end
+
+include("preview.jl")
+
 # ── Driver script ──────────────────────────────────────────────────────────────
 
 function _build_driver_script(
     code_str::AbstractString;
     stacktrace::Bool = false,
     versioninfo_path::Union{AbstractString,Nothing} = nothing,
+    plot_dir::Union{AbstractString,Nothing} = nothing,
 )
     versioninfo_stmt = isnothing(versioninfo_path) ? "" : """
     using InteractiveUtils
     open($(repr(versioninfo_path)), "w") do _mwe_vio
         InteractiveUtils.versioninfo(_mwe_vio)
     end
+    """
+    plot_setup = isnothing(plot_dir) ? "" : """
+    const _mwe_plot_count = Ref(0)
+    const _mwe_pending_plots = String[]
+    function _mwe_save_plot(x)
+        mkpath($(repr(String(plot_dir))))
+        _mwe_plot_count[] += 1
+        _mwe_path = joinpath(
+            $(repr(String(plot_dir))),
+            string("plot-", _mwe_plot_count[], ".png"),
+        )
+        open(_io -> Base.invokelatest(show, _io, MIME"image/png"(), x), _mwe_path, "w")
+        push!(_mwe_pending_plots, _mwe_path)
+        return nothing
+    end
+    struct _MWEPlotDisplay <: Base.AbstractDisplay end
+    Base.displayable(::_MWEPlotDisplay, ::MIME"image/png") = true
+    function Base.display(_d::_MWEPlotDisplay, x)
+        showable(MIME("image/png"), x) || throw(MethodError(Base.display, (_d, x)))
+        _mwe_save_plot(x)
+    end
+    Base.display(::_MWEPlotDisplay, ::MIME"image/png", x) = _mwe_save_plot(x)
+    pushdisplay(_MWEPlotDisplay())
+    """
+    # Runs after each expression: saves a png-showable value (unless suppressed with a
+    # trailing `;`) and emits one marker line per captured plot at that position.
+    plot_capture = isnothing(plot_dir) ? "" : """
+            if _mwe_err === nothing && _mwe_val !== nothing &&
+               Base.invokelatest(showable, MIME("image/png"), _mwe_val) &&
+               !endswith(_mwe_chunk, ';')
+                try
+                    _mwe_save_plot(_mwe_val)
+                    _mwe_val = nothing
+                catch _mwe_save_err
+                    _mwe_prefix_output(
+                        "ERROR: failed to save plot: " * sprint(showerror, _mwe_save_err),
+                    )
+                end
+            end
+            for _mwe_plot_path in _mwe_pending_plots
+                println($(repr(_PLOT_MARKER)), _mwe_plot_path)
+            end
+            empty!(_mwe_pending_plots)
     """
     return """
     using Logging
@@ -443,7 +584,7 @@ function _build_driver_script(
             println("#> ", line)
         end
     end
-
+    $plot_setup
     const _mwe_code = $(repr(code_str))
     const _mwe_src_lines = split(_mwe_code, '\\n')
 
@@ -465,7 +606,8 @@ function _build_driver_script(
             break
         end
         _mwe_end = i < length(_mwe_items) ? _mwe_items[i + 1][1] - 1 : length(_mwe_src_lines)
-        println(rstrip(join(_mwe_src_lines[_mwe_start:_mwe_end], '\\n')))
+        _mwe_chunk = rstrip(join(_mwe_src_lines[_mwe_start:_mwe_end], '\\n'))
+        println(_mwe_chunk)
 
         _mwe_original_out = Base.stdout
         _mwe_original_err = Base.stderr
@@ -494,6 +636,7 @@ function _build_driver_script(
 
         _mwe_prefix_output(_mwe_captured_out)
         _mwe_prefix_output(_mwe_captured_err)
+    $plot_capture
         if !isnothing(_mwe_err)
             if $(stacktrace)
                 _mwe_frames = Base.stacktrace(_mwe_bt)
@@ -579,13 +722,17 @@ function _run_in_new_process(
     stacktrace::Bool = false,
     versioninfo::Bool = false,
     julia_args::AbstractString = "",
+    plot_dir::Union{AbstractString,Nothing} = nothing,
 )
     mktempdir() do tmpdir
         temp && _setup_temp_env!(tmpdir, code_str, packagespecs, manifest_path; verbose)
 
         versioninfo_path = versioninfo ? joinpath(tmpdir, "mwe_versioninfo.txt") : nothing
         script_path = joinpath(tmpdir, "mwe_driver.jl")
-        write(script_path, _build_driver_script(code_str; stacktrace, versioninfo_path))
+        write(
+            script_path,
+            _build_driver_script(code_str; stacktrace, versioninfo_path, plot_dir),
+        )
 
         julia_exe = joinpath(Sys.BINDIR, Base.julia_exename())
         project_flag = temp ? "--project=$tmpdir" : "--project=@."
@@ -598,6 +745,9 @@ function _run_in_new_process(
                     join(["@", "@stdlib"], Sys.iswindows() ? ";" : ":"),
             )
         )
+        # Let GR (Plots.jl's default backend) render PNGs headless in the subprocess.
+        isnothing(plot_dir) ||
+            (cmd = addenv(cmd, "GKSwstype" => get(ENV, "GKSwstype", "100")))
 
         repl_output = try
             readchomp(cmd)
@@ -683,6 +833,7 @@ end
 function _execute_code_in_current_process(
     code_str::AbstractString;
     stacktrace::Bool = false,
+    plot_dir::Union{AbstractString,Nothing} = nothing,
 )
     buf = IOBuffer()
     src_lines = split(code_str, '\n')
@@ -696,30 +847,74 @@ function _execute_code_in_current_process(
             end
         end
     end
-    for (i, (start_line, node)) in enumerate(items)
-        if node isa Expr && node.head === :error
-            _prefix_lines(buf, "ERROR: " * sprint(showerror, node.args[1]), "#> ")
-            break
+    plot_count = Ref(0)
+    pending_plots = String[]
+    save_plot = function (x)
+        pdir = something(plot_dir)
+        mkpath(pdir)
+        plot_count[] += 1
+        path = joinpath(pdir, string("plot-", plot_count[], ".png"))
+        open(io -> Base.invokelatest(show, io, MIME"image/png"(), x), path, "w")
+        push!(pending_plots, path)
+        return nothing
+    end
+    sink = isnothing(plot_dir) ? nothing : _PlotSink(save_plot)
+    isnothing(sink) || pushdisplay(sink)
+    try
+        for (i, (start_line, node)) in enumerate(items)
+            if node isa Expr && node.head === :error
+                _prefix_lines(buf, "ERROR: " * sprint(showerror, node.args[1]), "#> ")
+                break
+            end
+            end_line = i < length(items) ? items[i+1][1] - 1 : length(src_lines)
+            ex_str = rstrip(join(src_lines[start_line:end_line], '\n'))
+            result = _capture_eval(node)
+            println(buf, ex_str)
+            _prefix_lines(buf, result.stdout, "#> ")
+            _prefix_lines(buf, result.stderr, "#> ")
+            value_to_show = result.value
+            if !isnothing(sink)
+                if isnothing(result.error) &&
+                   value_to_show !== nothing &&
+                   Base.invokelatest(showable, MIME("image/png"), value_to_show) &&
+                   !endswith(ex_str, ';')
+                    try
+                        save_plot(value_to_show)
+                        value_to_show = nothing
+                    catch save_err
+                        _prefix_lines(
+                            buf,
+                            "ERROR: failed to save plot: " * sprint(showerror, save_err),
+                            "#> ",
+                        )
+                    end
+                end
+                for p in pending_plots
+                    println(buf, _PLOT_MARKER, p)
+                end
+                empty!(pending_plots)
+            end
+            err = result.error
+            if !isnothing(err)
+                _prefix_lines(buf, "ERROR: " * _format_error(err; stacktrace), "#> ")
+                break
+            end
+            if i == length(items) && value_to_show !== nothing
+                val_buf = IOBuffer()
+                show(
+                    IOContext(val_buf, :limit => true, :color => false),
+                    MIME"text/plain"(),
+                    value_to_show,
+                )
+                _prefix_lines(buf, String(take!(val_buf)), "#> ")
+            end
         end
-        end_line = i < length(items) ? items[i+1][1] - 1 : length(src_lines)
-        ex_str = rstrip(join(src_lines[start_line:end_line], '\n'))
-        result = _capture_eval(node)
-        println(buf, ex_str)
-        _prefix_lines(buf, result.stdout, "#> ")
-        _prefix_lines(buf, result.stderr, "#> ")
-        err = result.error
-        if !isnothing(err)
-            _prefix_lines(buf, "ERROR: " * _format_error(err; stacktrace), "#> ")
-            break
-        end
-        if i == length(items) && result.value !== nothing
-            val_buf = IOBuffer()
-            show(
-                IOContext(val_buf, :limit => true, :color => false),
-                MIME"text/plain"(),
-                result.value,
-            )
-            _prefix_lines(buf, String(take!(val_buf)), "#> ")
+    finally
+        if !isnothing(sink)
+            try
+                popdisplay(sink)
+            catch
+            end
         end
     end
     return rstrip(String(take!(buf)), '\n')
@@ -733,6 +928,7 @@ function _run_in_current_process(
     verbose::Bool = false,
     stacktrace::Bool = false,
     versioninfo::Bool = false,
+    plot_dir::Union{AbstractString,Nothing} = nothing,
 )
     env_str() = versioninfo ? rstrip(sprint(interactive_versioninfo), '\n') : ""
     if temp
@@ -741,8 +937,9 @@ function _run_in_current_process(
             original_project = Base.active_project()
             try
                 Pkg.activate(tmpdir)
-                output = _execute_code_in_current_process(code_str; stacktrace)
-                return output, "", env_str()
+                temp_output =
+                    _execute_code_in_current_process(code_str; stacktrace, plot_dir)
+                return temp_output, "", env_str()
             finally
                 if isnothing(original_project)
                     Pkg.activate()
@@ -752,7 +949,8 @@ function _run_in_current_process(
             end
         end
     else
-        return _execute_code_in_current_process(code_str; stacktrace), "", env_str()
+        output = _execute_code_in_current_process(code_str; stacktrace, plot_dir)
+        return output, "", env_str()
     end
 end
 
@@ -771,6 +969,8 @@ function _run_mwe(
     stacktrace::Bool = _default(:stacktrace),
     versioninfo::Union{Bool,Nothing} = _default(:versioninfo),
     julia_args::AbstractString = _default(:julia_args),
+    plot_dir::AbstractString = _default(:plot_dir),
+    preview::Union{Bool,Symbol,Nothing} = _default(:preview),
 )
     venue in (:gh, :discord, :slack) ||
         error("venue must be :gh, :discord or :slack, got $(repr(venue))")
@@ -784,6 +984,8 @@ function _run_mwe(
     end
     _advertise = isnothing(advertise) ? (venue !== :slack) : advertise
     _versioninfo = isnothing(versioninfo) ? (venue === :gh) : versioninfo
+    _preview_target = _resolve_preview_target(preview)
+    _plot_dir = String(plot_dir)
 
     repl_output, manifest_str, env_str = if newprocess
         _run_in_new_process(
@@ -796,6 +998,7 @@ function _run_mwe(
             stacktrace,
             versioninfo = _versioninfo,
             julia_args,
+            plot_dir = _plot_dir,
         )
     else
         _run_in_current_process(
@@ -806,11 +1009,12 @@ function _run_mwe(
             verbose,
             stacktrace,
             versioninfo = _versioninfo,
+            plot_dir = _plot_dir,
         )
     end
 
     lang = venue === :slack ? "" : "julia"
-    md = "```$lang\n$repl_output\n```"
+    md, plot_paths = _assemble_body(repl_output, lang)
     if _advertise
         notes = String[]
         !newprocess && push!(notes, "in-process")
@@ -831,14 +1035,31 @@ function _run_mwe(
         md *= "\n\n<details>\n<summary>Manifest.toml</summary>\n\n```toml\n$manifest_str\n```\n\n</details>"
     end
 
-    try
-        clipboard(md)
-        @info "MWE copied to clipboard!"
-    catch
-        @info "Could not copy to clipboard — printing only."
+    if !isempty(plot_paths)
+        @info "Saved $(length(plot_paths)) plot file(s) to $(_plot_dir). Upload them to " *
+              "your post to replace the placeholder(s)."
     end
-    println(md)
-    return MWEResult(md)
+
+    clipboard_ok = try
+        clipboard(md)
+        true
+    catch
+        false
+    end
+    if clipboard_ok
+        @info "MWE copied to clipboard!"
+    else
+        @info "Could not copy to clipboard — printing below."
+    end
+    # Skip the console dump when interactive and clipboard succeeded: the user already
+    # has the Markdown on their clipboard and (by default) a preview about to open.
+    (clipboard_ok && isinteractive()) || println(md)
+    result = MWEResult(md)
+    # The `preview` kwarg shadows the function of the same name, so qualify.
+    if _preview_target isa Symbol
+        MinimalWorkingExamples.preview(result; target = _preview_target)
+    end
+    return result
 end
 
 end # module

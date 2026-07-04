@@ -1,12 +1,13 @@
 name = "MinimalWorkingExamples"
 uuid = "1cd72250-7741-5363-ad87-1e7986b7dfb4"
-version = "0.1.2"
+version = "0.1.3-DEV"
 authors = ["Bjarke Hautop Kristensen <bjarke.hautop@gmail.com>"]
 
 [workspace]
 projects = ["test", "docs"]
 
 [deps]
+Base64 = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
