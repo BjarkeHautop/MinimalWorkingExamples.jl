@@ -40,7 +40,8 @@ end
 
     Generally [`mwe()`](@ref) is the better choice: it preserves your code's exact formatting and comments, and all you need to do is copy the code and call it. [`@mwe`](@ref) strips comments and requires a `begin...end` block, but is more convenient to show inline, so most examples in this documentation use it.
 
-Either way, this runs the code as a script in a fresh Julia process with a clean temporary environment, copies the result to your clipboard, and prints it:
+Either way, this runs the code as a script in a fresh Julia process with a clean temporary environment, copies the result to your clipboard, and shows a preview of the rendered
+Markdown:
 
 ```@raw html
 <div class="gh-output">

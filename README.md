@@ -14,8 +14,7 @@ Inspired by the R package [reprex](https://reprex.tidyverse.org/).
 
 ## Installation
 
-MinimalWorkingExamples can be installed directly from the Julia package manager. In the Julia REPL, press `]`
-to enter the Pkg mode, then run:
+MinimalWorkingExamples can be installed directly from the Julia package manager. In the Julia REPL, press `]` to enter the Pkg mode, then run:
 
 ```julia
 pkg> add MinimalWorkingExamples
@@ -44,7 +43,8 @@ end
 > [!NOTE]
 > `mwe()` is generally the better choice: it preserves your code's exact formatting and comments, and all you need to do is copy the code and call `mwe()`. `@mwe` strips comments and requires a `begin...end` block, but is more convenient for showcasing.
 
-Either way, this runs the code as a script in a fresh Julia process with a clean temporary environment, copies the result to your clipboard, and prints it:
+Either way, this runs the code as a script in a fresh Julia process with a clean temporary environment, copies the result to your clipboard, and shows a preview of the rendered
+Markdown:
 
 ````markdown
 ```julia
