@@ -333,6 +333,19 @@ end
     @test contains(result.md, "#> 2")  # 2 == "no", 0 would be the default
 end
 
+@testitem "footer note: julia_args" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "1 + 1";
+        temp = false,
+        newprocess = true,
+        manifest = false,
+        advertise = true,
+        packagespecs = [],
+        julia_args = "--check-bounds=no",
+    )
+    @test contains(result.md, "julia_args: --check-bounds=no")
+end
+
 @testitem "julia_args requires newprocess=true" tags=[:unit, :fast] begin
     @test_throws ErrorException MinimalWorkingExamples._run_mwe(
         "1 + 1";

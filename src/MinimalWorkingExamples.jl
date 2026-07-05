@@ -1026,6 +1026,7 @@ function _run_mwe(
         elseif !isempty(packagespecs)
             push!(notes, "pinned: " * join(_describe_packagespec.(packagespecs), ", "))
         end
+        isempty(julia_args) || push!(notes, "julia_args: $julia_args")
         extra = isempty(notes) ? "" : " · " * join(notes, " · ")
         note = "Created on $(today()) with [MinimalWorkingExamples v$(pkgversion(MinimalWorkingExamples))](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia $VERSION$extra"
         md *= venue === :discord ? "\n\n-# $note" : "\n\n<sup>$note</sup>"
