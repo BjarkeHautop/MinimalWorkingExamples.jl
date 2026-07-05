@@ -509,6 +509,13 @@ end
     @test contains(result.md, "#> 21")
 end
 
+@testitem "mwe() comments before any expressions are preserved" tags=[:unit, :fast] begin
+    result = mwe("# comment\n1 + 1"; advertise = false)
+    @test result isa MWEResult
+    @test contains(result.md, "# comment")
+    @test contains(result.md, "#> 2")
+end
+
 # ── _describe_packagespec ──────────────────────────────────────────────────────
 
 @testitem "_describe_packagespec" tags=[:unit, :fast] begin

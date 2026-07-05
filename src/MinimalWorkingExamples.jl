@@ -588,14 +588,16 @@ function _build_driver_script(
     const _mwe_code = $(repr(code_str))
     const _mwe_src_lines = split(_mwe_code, '\\n')
 
-    # Pair each expression with its start line from LineNumberNodes
+    # Pair each expression with its start line from LineNumberNodes. The first
+    # item always starts at line 1 so that comments preceding the first
+    # expression (which precede any LineNumberNode) are not dropped.
     _mwe_items = Tuple{Int,Any}[]
     let _cur_line = 1
         for _n in Meta.parseall(_mwe_code).args
             if _n isa LineNumberNode
                 _cur_line = _n.line
             else
-                push!(_mwe_items, (_cur_line, _n))
+                push!(_mwe_items, (isempty(_mwe_items) ? 1 : _cur_line, _n))
             end
         end
     end
@@ -843,7 +845,7 @@ function _execute_code_in_current_process(
             if n isa LineNumberNode
                 cur_line = n.line
             else
-                push!(items, (cur_line, n))
+                push!(items, (isempty(items) ? 1 : cur_line, n))
             end
         end
     end
