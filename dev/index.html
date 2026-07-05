@@ -8,7 +8,7 @@ mwe()</code></pre><p>Or write your code in a <code>begin...end</code> block and 
 end</code></pre><div class="admonition is-info" id="Note-1a8cdaa495c21699"><header class="admonition-header">Note<a class="admonition-anchor" href="#Note-1a8cdaa495c21699" title="Permalink"></a></header><div class="admonition-body"><p>Generally <a href="95-reference/#MinimalWorkingExamples.mwe"><code>mwe()</code></a> is the better choice: it preserves your code&#39;s exact formatting and comments, and all you need to do is copy the code and call it. <a href="95-reference/#MinimalWorkingExamples.@mwe"><code>@mwe</code></a> strips comments and requires a <code>begin...end</code> block, but is more convenient to show inline, so most examples in this documentation use it.</p></div></div><p>Either way, this runs the code as a script in a fresh Julia process with a clean temporary environment, copies the result to your clipboard, and shows a preview of the rendered Markdown:</p><div class="gh-output"><pre><code class="language-julia hljs">using Statistics
 x = [1, 2, 3, 4, 5]
 mean(x)
-#&gt; 3.0</code></pre><small>Created on 2026-07-05 with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v0.1.3</a> using Julia 1.12.6</small>
+#&gt; 3.0</code></pre><small>Created on 2026-07-05 with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v0.1.4-DEV</a> using Julia 1.12.6</small>
 
 <details>
 <summary>Environment</summary>
@@ -18,9 +18,9 @@ Build Info:
   Official https://julialang.org release
 Platform Info:
   OS: Linux (x86_64-linux-gnu)
-  CPU: 4 × AMD EPYC 7763 64-Core Processor
+  CPU: 4 × AMD EPYC 9V74 80-Core Processor
   WORD_SIZE: 64
-  LLVM: libLLVM-18.1.7 (ORCJIT, znver3)
+  LLVM: libLLVM-18.1.7 (ORCJIT, znver4)
   GC: Built with stock GC
 Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)
 Environment:
@@ -37,7 +37,7 @@ end venue=:slack</code></pre><p><code>:discord</code> matches <code>:gh</code> b
     x[1]  # never reached
 end versioninfo=false</code></pre><p>Output:</p><div class="gh-output"><pre><code class="language-julia hljs">x = [1, 2, 3]
 x[10]
-#&gt; ERROR: BoundsError: attempt to access 3-element Vector{Int64} at index [10]</code></pre><small>Created on 2026-07-05 with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v0.1.3</a> using Julia 1.12.6</small>
+#&gt; ERROR: BoundsError: attempt to access 3-element Vector{Int64} at index [10]</code></pre><small>Created on 2026-07-05 with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v0.1.4-DEV</a> using Julia 1.12.6</small>
 </div><p>Stacktrace can be included by passing <code>stacktrace=true</code>:</p><pre><code class="language-julia hljs">@mwe begin
     x = [1, 2, 3]
     x[10]
@@ -52,7 +52,7 @@ x[10]
 #&gt;  [2] getindex(A::Vector{Int64}, i::Int64)
 #&gt;    @ Base ./essentials.jl:919
 #&gt;  [3] top-level scope
-#&gt;    @ none:1</code></pre><small>Created on 2026-07-05 with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v0.1.3</a> using Julia 1.12.6</small>
+#&gt;    @ none:1</code></pre><small>Created on 2026-07-05 with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v0.1.4-DEV</a> using Julia 1.12.6</small>
 </div><h2 id="Plots"><a class="docs-heading-anchor" href="#Plots">Plots</a><a id="Plots-1"></a><a class="docs-heading-anchor-permalink" href="#Plots" title="Permalink"></a></h2><p>Any plot produced while running the code is saved as a PNG file and replaced in the Markdown with a <code>**Insert plot here: &lt;path&gt;**</code> placeholder at the position it was produced. Files land in the <code>plot_dir</code> directory (default <code>MWEPlots/</code>, created next to your working directory); upload them alongside the generated Markdown.</p><p>Copy the following code, taken from the <a href="https://docs.juliaplots.org/stable/#">Plots.jl documentation</a>, and call <code>mwe()</code> on it; this is the output:</p><div class="gh-output"><pre><code class="language-julia hljs"># load a dataset
 using RDatasets
 iris = dataset(&quot;datasets&quot;, &quot;iris&quot;);
@@ -71,7 +71,7 @@ using StatsPlots
     ylabel = &quot;Width&quot;,
     m = (0.5, [:cross :hex :star7], 12),
     bg = RGB(0.2, 0.2, 0.2)
-)</code></pre><p><img src="assets/plot-example.png" alt="plot" style="max-width: 100%;"></p><small>Created on 2026-07-05 with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v0.1.3</a> using Julia 1.12.6</small>
+)</code></pre><p><img src="assets/plot-example.png" alt="plot" style="max-width: 100%;"></p><small>Created on 2026-07-05 with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v0.1.4-DEV</a> using Julia 1.12.6</small>
 
 <details>
 <summary>Environment</summary>
@@ -81,9 +81,9 @@ Build Info:
   Official https://julialang.org release
 Platform Info:
   OS: Linux (x86_64-linux-gnu)
-  CPU: 4 × AMD EPYC 7763 64-Core Processor
+  CPU: 4 × AMD EPYC 9V74 80-Core Processor
   WORD_SIZE: 64
-  LLVM: libLLVM-18.1.7 (ORCJIT, znver3)
+  LLVM: libLLVM-18.1.7 (ORCJIT, znver4)
   GC: Built with stock GC
 Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)
 Environment:
@@ -100,8 +100,8 @@ end manifest=true</code></pre><h2 id="Pinning-a-specific-package-version"><a cla
     Example.hello(&quot;World&quot;)
 end packagespecs=[PackageSpec(name=&quot;Example&quot;, version=&quot;0.5.3&quot;)] versioninfo=false</code></pre><p>Output:</p><div class="gh-output"><pre><code class="language-julia hljs">using Example
 Example.hello(&quot;World&quot;)
-#&gt; &quot;Hello, World!&quot;</code></pre><small>Created on 2026-07-05 with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v0.1.3</a> using Julia 1.12.6 · pinned: Example v0.5.3</small>
+#&gt; &quot;Hello, World!&quot;</code></pre><small>Created on 2026-07-05 with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v0.1.4-DEV</a> using Julia 1.12.6 · pinned: Example v0.5.3</small>
 </div><p>For more details on packagespecs options see <a href="https://pkgdocs.julialang.org/v1/api/#Pkg.PackageSpec"><code>Pkg.PackageSpec</code> documentation</a>.</p><h2 id="Reproducing-an-exact-environment"><a class="docs-heading-anchor" href="#Reproducing-an-exact-environment">Reproducing an exact environment</a><a id="Reproducing-an-exact-environment-1"></a><a class="docs-heading-anchor-permalink" href="#Reproducing-an-exact-environment" title="Permalink"></a></h2><p>Pass <code>manifest_path</code> to use an existing <code>Manifest.toml</code> as-is.</p><pre><code class="language-julia hljs">@mwe begin
     using Example
     Example.hello(&quot;World&quot;)
-end manifest_path=&quot;/path/to/your/Manifest.toml&quot;</code></pre></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="10-writing-mwes/">Writing MWEs »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Sunday 5 July 2026 09:01">Sunday 5 July 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+end manifest_path=&quot;/path/to/your/Manifest.toml&quot;</code></pre></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="10-writing-mwes/">Writing MWEs »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Sunday 5 July 2026 13:27">Sunday 5 July 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
