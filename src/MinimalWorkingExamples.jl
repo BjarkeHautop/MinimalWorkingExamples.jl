@@ -584,6 +584,17 @@ function _build_driver_script(
             println("#> ", line)
         end
     end
+    function _mwe_is_comment_or_blank(line)
+        stripped = lstrip(line)
+        return isempty(stripped) || startswith(stripped, '#')
+    end
+    function _mwe_find_expr_end_line(_mwe_src_lines, _mwe_start_line, _mwe_nominal_end)
+        _mwe_end = _mwe_nominal_end
+        while _mwe_end >= _mwe_start_line && _mwe_is_comment_or_blank(_mwe_src_lines[_mwe_end])
+            _mwe_end -= 1
+        end
+        return max(_mwe_end, _mwe_start_line)
+    end
     $plot_setup
     const _mwe_code = $(repr(code_str))
     const _mwe_src_lines = split(_mwe_code, '\\n')
@@ -607,7 +618,8 @@ function _build_driver_script(
             _mwe_prefix_output("ERROR: " * sprint(showerror, _mwe_node.args[1]))
             break
         end
-        _mwe_end = i < length(_mwe_items) ? _mwe_items[i + 1][1] - 1 : length(_mwe_src_lines)
+        _mwe_nominal_end = i < length(_mwe_items) ? _mwe_items[i + 1][1] - 1 : length(_mwe_src_lines)
+        _mwe_end = _mwe_find_expr_end_line(_mwe_src_lines, _mwe_start, _mwe_nominal_end)
         _mwe_chunk = rstrip(join(_mwe_src_lines[_mwe_start:_mwe_end], '\\n'))
         println(_mwe_chunk)
 
@@ -825,6 +837,27 @@ function _user_frames(bt::Vector)
     return isnothing(cutoff) ? frames : frames[1:(cutoff-1)]
 end
 
+# Check if a source line contains only whitespace or a comment.
+function _is_comment_or_blank(line::AbstractString)
+    stripped = lstrip(line)
+    return isempty(stripped) || startswith(stripped, '#')
+end
+
+# Find the actual end line of an expression, excluding trailing comment/blank lines.
+function _find_expr_end_line(
+    src_lines::Vector{<:AbstractString},
+    start_line::Int,
+    nominal_end_line::Int,
+)
+    end_line = nominal_end_line
+    # Walk backward from nominal_end_line, skipping comment-only and blank lines.
+    while end_line >= start_line && _is_comment_or_blank(src_lines[end_line])
+        end_line -= 1
+    end
+    # If we walked past the start line, use the start line.
+    return max(end_line, start_line)
+end
+
 function _format_error(ce::CapturedError; stacktrace::Bool = false)
     stacktrace || return sprint(showerror, ce.exception)
     frames = _user_frames(ce.backtrace)
@@ -868,7 +901,8 @@ function _execute_code_in_current_process(
                 _prefix_lines(buf, "ERROR: " * sprint(showerror, node.args[1]), "#> ")
                 break
             end
-            end_line = i < length(items) ? items[i+1][1] - 1 : length(src_lines)
+            nominal_end = i < length(items) ? items[i+1][1] - 1 : length(src_lines)
+            end_line = _find_expr_end_line(src_lines, start_line, nominal_end)
             ex_str = rstrip(join(src_lines[start_line:end_line], '\n'))
             result = _capture_eval(node)
             println(buf, ex_str)

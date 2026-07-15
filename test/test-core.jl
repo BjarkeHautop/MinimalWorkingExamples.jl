@@ -529,6 +529,28 @@ end
     @test contains(result.md, "#> 2")
 end
 
+@testitem "trailing comment-only lines are not included in expression output" tags=[
+    :unit,
+    :fast,
+] begin
+    result = mwe(
+        "1+1\n# comment\nprintln(1+1)\n# comment\n1+1\n# comment\n1+2";
+        temp = false,
+        newprocess = false,
+        advertise = false,
+    )
+    @test result isa MWEResult
+    # Output should not have comments appearing in the middle of expressions
+    lines = split(result.md, '\n')
+    # Find the line with the first output
+    idx = findfirst(l -> contains(l, "println(1+1)"), lines)
+    @test !isnothing(idx)
+    # The next non-empty line should be the output, not a comment
+    next_idx = findnext(l -> !isempty(strip(l)), lines, idx + 1)
+    @test !isnothing(next_idx)
+    @test startswith(lines[next_idx], "#> 2")
+end
+
 # ── _describe_packagespec ──────────────────────────────────────────────────────
 
 @testitem "_describe_packagespec" tags=[:unit, :fast] begin
