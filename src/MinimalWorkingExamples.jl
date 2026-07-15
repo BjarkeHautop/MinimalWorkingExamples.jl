@@ -16,7 +16,6 @@ const _DEFAULTS = (
     manifest = false,
     advertise = nothing,
     verbose = false,
-    stacktrace = false,
     versioninfo = nothing,
     julia_args = "",
     plot_dir = "MWEPlots",
@@ -59,7 +58,7 @@ Persistently override the default keyword arguments of [`@mwe`](@ref) and
 [`mwe`](@ref) using [Preferences.jl](https://github.com/JuliaPackaging/Preferences.jl).
 
 Any of `venue`, `temp`, `newprocess`, `manifest`, `advertise`, `verbose`,
-`stacktrace`, `versioninfo`, `julia_args`, `plot_dir`, and `preview` may be set.
+`versioninfo`, `julia_args`, `plot_dir`, and `preview` may be set.
 Passing `nothing` for a key clears it, reverting to the built-in default.
 
 # Examples
@@ -119,7 +118,7 @@ end
     end [venue=:gh] [temp=true] [newprocess=true] [manifest=false]
         [advertise=nothing] [versioninfo=nothing] [preview=nothing]
         [packagespecs=PackageSpec[]] [manifest_path=nothing] [verbose=false]
-        [stacktrace=false] [julia_args=""] [plot_dir="MWEPlots"]
+        [julia_args=""] [plot_dir="MWEPlots"]
 
 Generate a Minimal Working Example (MWE) formatted as Markdown, then copy it to the clipboard.
 
@@ -151,7 +150,6 @@ The code is rendered as a copy-pasteable Julia script with the output of the fin
   Mutually exclusive with `packagespecs`.
 - `verbose=false`: if `true`, show Pkg output (downloads, resolver messages) during environment
   setup.
-- `stacktrace=false`: if `true`, append the full stacktrace after the error message.
 - `julia_args=""`: extra command-line flags passed through to the isolated Julia process, e.g.
   `"-t 4"` or `"--check-bounds=no"`. Only valid when `newprocess=true`.
 - `plot_dir="MWEPlots"`: directory in which plots produced by the code are saved as PNGs.
@@ -196,15 +194,6 @@ using Pkg
     using Example
     Example.hello("World")
 end packagespecs=[PackageSpec(name="Example", version="0.5.3")]
-```
-
-Include the stacktrace when an error is thrown:
-
-```julia
-@mwe begin
-    x = [1, 2, 3]
-    x[10]
-end stacktrace=true
 ```
 """
 macro mwe(ex, kwargs...)
@@ -263,7 +252,6 @@ function mwe(
     packagespecs::Vector = Pkg.PackageSpec[],
     manifest_path::Union{AbstractString,Nothing} = nothing,
     verbose::Bool = _default(:verbose),
-    stacktrace::Bool = _default(:stacktrace),
     versioninfo::Union{Bool,Nothing} = _default(:versioninfo),
     julia_args::AbstractString = _default(:julia_args),
     plot_dir::AbstractString = _default(:plot_dir),
@@ -279,7 +267,6 @@ function mwe(
         packagespecs,
         manifest_path,
         verbose,
-        stacktrace,
         versioninfo,
         julia_args,
         plot_dir,
@@ -522,7 +509,7 @@ include("preview.jl")
 
 function _build_driver_script(
     code_str::AbstractString;
-    stacktrace::Bool = false,
+    stacktrace_path::Union{AbstractString,Nothing} = nothing,
     versioninfo_path::Union{AbstractString,Nothing} = nothing,
     plot_dir::Union{AbstractString,Nothing} = nothing,
 )
@@ -652,19 +639,21 @@ function _build_driver_script(
         _mwe_prefix_output(_mwe_captured_err)
     $plot_capture
         if !isnothing(_mwe_err)
-            if $(stacktrace)
+            _mwe_err_str = sprint(showerror, _mwe_err)
+            _mwe_prefix_output("ERROR: " * _mwe_err_str)
+            if $(isnothing(stacktrace_path) ? "false" : "true")
                 _mwe_frames = Base.stacktrace(_mwe_bt)
                 _mwe_cutoff = findfirst(
                     f -> f.func === :eval && endswith(String(f.file), "boot.jl"),
                     _mwe_frames,
                 )
                 _mwe_frames = isnothing(_mwe_cutoff) ? _mwe_frames : _mwe_frames[1:_mwe_cutoff-1]
-                _mwe_st = isempty(_mwe_frames) ? "" : "\\n" * sprint(Base.show_backtrace, _mwe_frames)
-                _mwe_err_str = sprint(showerror, _mwe_err) * _mwe_st
-            else
-                _mwe_err_str = sprint(showerror, _mwe_err)
+                if !isempty(_mwe_frames)
+                    open($(repr(stacktrace_path)), "w") do _mwe_st_io
+                        Base.show_backtrace(_mwe_st_io, _mwe_frames)
+                    end
+                end
             end
-            _mwe_prefix_output("ERROR: " * _mwe_err_str)
             break
         end
         if i == length(_mwe_items) && _mwe_val !== nothing
@@ -733,7 +722,6 @@ function _run_in_new_process(
     packagespecs::Vector = Pkg.PackageSpec[],
     manifest_path::Union{AbstractString,Nothing} = nothing,
     verbose::Bool = false,
-    stacktrace::Bool = false,
     versioninfo::Bool = false,
     julia_args::AbstractString = "",
     plot_dir::Union{AbstractString,Nothing} = nothing,
@@ -741,11 +729,12 @@ function _run_in_new_process(
     mktempdir() do tmpdir
         temp && _setup_temp_env!(tmpdir, code_str, packagespecs, manifest_path; verbose)
 
+        stacktrace_path = joinpath(tmpdir, "mwe_stacktrace.txt")
         versioninfo_path = versioninfo ? joinpath(tmpdir, "mwe_versioninfo.txt") : nothing
         script_path = joinpath(tmpdir, "mwe_driver.jl")
         write(
             script_path,
-            _build_driver_script(code_str; stacktrace, versioninfo_path, plot_dir),
+            _build_driver_script(code_str; stacktrace_path, versioninfo_path, plot_dir),
         )
 
         julia_exe = joinpath(Sys.BINDIR, Base.julia_exename())
@@ -780,7 +769,12 @@ function _run_in_new_process(
             env_str = rstrip(read(versioninfo_path, String), '\n')
         end
 
-        return repl_output, manifest_str, env_str
+        stacktrace_str = ""
+        if isfile(stacktrace_path)
+            stacktrace_str = lstrip(rstrip(read(stacktrace_path, String), '\n'), '\n')
+        end
+
+        return repl_output, manifest_str, env_str, stacktrace_str
     end
 end
 
@@ -867,10 +861,10 @@ end
 
 function _execute_code_in_current_process(
     code_str::AbstractString;
-    stacktrace::Bool = false,
     plot_dir::Union{AbstractString,Nothing} = nothing,
 )
     buf = IOBuffer()
+    stacktrace_str = ""
     src_lines = split(code_str, '\n')
     items = Tuple{Int,Any}[]
     let cur_line = 1
@@ -932,7 +926,11 @@ function _execute_code_in_current_process(
             end
             err = result.error
             if !isnothing(err)
-                _prefix_lines(buf, "ERROR: " * _format_error(err; stacktrace), "#> ")
+                _prefix_lines(buf, "ERROR: " * sprint(showerror, err.exception), "#> ")
+                frames = _user_frames(err.backtrace)
+                if !isempty(frames)
+                    stacktrace_str = lstrip(sprint(Base.show_backtrace, frames), '\n')
+                end
                 break
             end
             if i == length(items) && value_to_show !== nothing
@@ -953,7 +951,7 @@ function _execute_code_in_current_process(
             end
         end
     end
-    return rstrip(String(take!(buf)), '\n')
+    return rstrip(String(take!(buf)), '\n'), stacktrace_str
 end
 
 function _run_in_current_process(
@@ -962,7 +960,6 @@ function _run_in_current_process(
     packagespecs::Vector = Pkg.PackageSpec[],
     manifest_path::Union{AbstractString,Nothing} = nothing,
     verbose::Bool = false,
-    stacktrace::Bool = false,
     versioninfo::Bool = false,
     plot_dir::Union{AbstractString,Nothing} = nothing,
 )
@@ -973,9 +970,9 @@ function _run_in_current_process(
             original_project = Base.active_project()
             try
                 Pkg.activate(tmpdir)
-                temp_output =
-                    _execute_code_in_current_process(code_str; stacktrace, plot_dir)
-                return temp_output, "", env_str()
+                temp_output, stacktrace_str =
+                    _execute_code_in_current_process(code_str; plot_dir)
+                return temp_output, "", env_str(), stacktrace_str
             finally
                 if isnothing(original_project)
                     Pkg.activate()
@@ -985,8 +982,8 @@ function _run_in_current_process(
             end
         end
     else
-        output = _execute_code_in_current_process(code_str; stacktrace, plot_dir)
-        return output, "", env_str()
+        output, stacktrace_str = _execute_code_in_current_process(code_str; plot_dir)
+        return output, "", env_str(), stacktrace_str
     end
 end
 
@@ -1002,7 +999,6 @@ function _run_mwe(
     packagespecs::Vector = Pkg.PackageSpec[],
     manifest_path::Union{AbstractString,Nothing} = nothing,
     verbose::Bool = _default(:verbose),
-    stacktrace::Bool = _default(:stacktrace),
     versioninfo::Union{Bool,Nothing} = _default(:versioninfo),
     julia_args::AbstractString = _default(:julia_args),
     plot_dir::AbstractString = _default(:plot_dir),
@@ -1023,7 +1019,7 @@ function _run_mwe(
     _preview_target = _resolve_preview_target(preview)
     _plot_dir = String(plot_dir)
 
-    repl_output, manifest_str, env_str = if newprocess
+    repl_output, manifest_str, env_str, stacktrace_str = if newprocess
         _run_in_new_process(
             code_str;
             temp,
@@ -1031,7 +1027,6 @@ function _run_mwe(
             packagespecs,
             manifest_path,
             verbose,
-            stacktrace,
             versioninfo = _versioninfo,
             julia_args,
             plot_dir = _plot_dir,
@@ -1043,7 +1038,6 @@ function _run_mwe(
             packagespecs,
             manifest_path,
             verbose,
-            stacktrace,
             versioninfo = _versioninfo,
             plot_dir = _plot_dir,
         )
@@ -1064,6 +1058,9 @@ function _run_mwe(
         extra = isempty(notes) ? "" : " · " * join(notes, " · ")
         note = "Created on $(today()) with [MinimalWorkingExamples v$(pkgversion(MinimalWorkingExamples))](https://github.com/BjarkeHautop/MinimalWorkingExamples.jl) using Julia $VERSION$extra"
         md *= venue === :discord ? "\n\n-# $note" : "\n\n<sup>$note</sup>"
+    end
+    if !isempty(stacktrace_str) && venue === :gh
+        md *= "\n\n<details>\n<summary>Stacktrace</summary>\n\n```julia\n$stacktrace_str\n```\n\n</details>"
     end
     if _versioninfo && !isempty(env_str)
         md *= "\n\n<details>\n<summary>Environment</summary>\n\n```text\n$env_str\n```\n\n</details>"

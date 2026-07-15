@@ -94,13 +94,12 @@ end venue=:slack
 
 ## Errors
 
-If the code throws an error, it is captured and shown as a `#>` comment — execution stops at that line:
+If the code throws an error, it is captured and shown as a `#>` comment. The stacktrace is included in a collapsible block below the code:
 
 ```julia
 @mwe begin
     x = [1, 2, 3]
     x[10]
-    x[1]  # never reached
 end versioninfo=false
 ```
 
@@ -118,41 +117,23 @@ x[10]
 
 ```@raw html
 <small>Created on <date> with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v<version></a> using Julia <julia-version></small>
-</div>
-```
 
-Stacktrace can be included by passing `stacktrace=true`:
+<details>
+<summary>Stacktrace</summary>
 
-```julia
-@mwe begin
-    x = [1, 2, 3]
-    x[10]
-    x[1]  # never reached
-end stacktrace=true versioninfo=false
-```
-
-Output:
-
-```@raw html
-<div class="gh-output">
 ```
 
 ```julia
-x = [1, 2, 3]
-x[10]
-#> ERROR: BoundsError: attempt to access 3-element Vector{Int64} at index [10]
-#>
-#> Stacktrace:
-#>  [1] throw_boundserror(A::Vector{Int64}, I::Tuple{Int64})
-#>    @ Base ./essentials.jl:15
-#>  [2] getindex(A::Vector{Int64}, i::Int64)
-#>    @ Base ./essentials.jl:919
-#>  [3] top-level scope
-#>    @ none:1
+ [1] throw_boundserror(A::Vector{Int64}, I::Tuple{Int64})
+   @ Base ./essentials.jl:15
+ [2] getindex(A::Vector{Int64}, i::Int64)
+   @ Base ./essentials.jl:919
+ [3] top-level scope
+   @ none:1
 ```
 
 ```@raw html
-<small>Created on <date> with <a href="https://github.com/BjarkeHautop/MinimalWorkingExamples.jl">MinimalWorkingExamples v<version></a> using Julia <julia-version></small>
+</details>
 </div>
 ```
 

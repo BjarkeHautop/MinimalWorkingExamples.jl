@@ -453,34 +453,6 @@ end
     @test contains(result.md, "#> 4")          # last expression value shown
 end
 
-@testitem "stacktrace=true includes Stacktrace in error output" tags=[:unit, :fast] begin
-    result = @mwe begin
-        error("oops");
-    end temp=false newprocess=false manifest=false advertise=false stacktrace=true
-    @test contains(result.md, "#> ERROR:")
-    @test contains(result.md, "oops")
-    @test contains(result.md, "Stacktrace")
-    # Driver/runtime infrastructure frames should be stripped
-    @test !contains(result.md, "mwe_driver.jl")
-    @test !contains(result.md, "invokelatest")
-    @test !contains(result.md, "with_logger")
-end
-
-@testitem "stacktrace=false (default) omits Stacktrace" tags=[:unit, :fast] begin
-    result = MinimalWorkingExamples._run_mwe(
-        """error("oops")""";
-        temp = false,
-        newprocess = false,
-        manifest = false,
-        advertise = false,
-        packagespecs = [],
-        stacktrace = false,
-    )
-    @test contains(result.md, "#> ERROR:")
-    @test contains(result.md, "oops")
-    @test !contains(result.md, "Stacktrace")
-end
-
 @testitem "error stops execution of subsequent expressions" tags=[:unit, :fast] begin
     result = MinimalWorkingExamples._run_mwe(
         "error(\"oops\")\n1 + 1";
