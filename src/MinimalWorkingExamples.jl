@@ -7,7 +7,7 @@ using Pkg
 using InteractiveUtils: clipboard, versioninfo as interactive_versioninfo
 using Preferences: load_preference, set_preferences!
 
-export @mwe, MWEResult, mwe, preview, set_defaults!
+export @mwe, MWEResult, mwe, mwe_rescue, preview, set_defaults!
 
 const _DEFAULTS = (
     venue = :gh,
@@ -259,6 +259,87 @@ function mwe(
 )
     _run_mwe(
         code;
+        venue,
+        temp,
+        newprocess,
+        manifest,
+        advertise,
+        packagespecs,
+        manifest_path,
+        verbose,
+        versioninfo,
+        julia_args,
+        plot_dir,
+        preview,
+    )
+end
+
+# Strip a copy-pasted `julia> ` REPL transcript down to runnable code: drop the
+# `julia> ` prompt, dedent continuation lines (the REPL indents them to align
+# under the prompt), and discard anything else (printed output, blank lines).
+const _RESCUE_PROMPT_RE = r"^julia> ?"
+const _RESCUE_CONTINUATION_RE = r"^ {7}"
+
+function _rescue_transcript(text::AbstractString)
+    lines = split(replace(text, "\r\n" => "\n"), '\n')
+    code_lines = String[]
+    for line in lines
+        if occursin(_RESCUE_PROMPT_RE, line)
+            push!(code_lines, replace(line, _RESCUE_PROMPT_RE => ""; count = 1))
+        elseif occursin(_RESCUE_CONTINUATION_RE, line) && !isempty(strip(line))
+            push!(code_lines, replace(line, _RESCUE_CONTINUATION_RE => ""; count = 1))
+        end
+        # else: blank line or printed output -- discard
+    end
+    return join(code_lines, "\n")
+end
+
+"""
+    mwe_rescue([transcript]; kwargs...)
+
+Rescue a copy-pasted Julia REPL transcript into an MWE: strips the `julia> `
+prompt, dedents continuation lines, discards printed output, then runs the
+remaining code through [`mwe`](@ref).
+
+If `transcript` is omitted, it is read from the clipboard.
+
+# Keyword arguments
+
+Accepts the same keyword arguments (with the same defaults) as [`mwe`](@ref).
+
+# Examples
+
+```julia
+mwe_rescue(\"""
+julia> x = 1 + 1
+2
+
+julia> x * 2
+4
+\"""; advertise=false)
+```
+Produces the same MWE as `mwe("x = 1 + 1\\nx * 2"; advertise=false)`.
+
+!!! note
+    Only the plain `julia> ` prompt is recognized.
+"""
+function mwe_rescue(
+    transcript::AbstractString = clipboard();
+    venue::Symbol = _default(:venue),
+    temp::Bool = _default(:temp),
+    newprocess::Bool = _default(:newprocess),
+    manifest::Bool = _default(:manifest),
+    advertise::Union{Bool,Nothing} = _default(:advertise),
+    packagespecs::Vector = Pkg.PackageSpec[],
+    manifest_path::Union{AbstractString,Nothing} = nothing,
+    verbose::Bool = _default(:verbose),
+    versioninfo::Union{Bool,Nothing} = _default(:versioninfo),
+    julia_args::AbstractString = _default(:julia_args),
+    plot_dir::AbstractString = _default(:plot_dir),
+    preview::Union{Bool,Symbol,Nothing} = _default(:preview),
+)
+    _run_mwe(
+        _rescue_transcript(transcript);
         venue,
         temp,
         newprocess,
@@ -582,6 +663,28 @@ function _build_driver_script(
         end
         return max(_mwe_end, _mwe_start_line)
     end
+    # Find where an expression's *displayed* source should start: right after the
+    # previous expression's (trimmed) end, skipping purely blank lines but
+    # stopping at the first comment line, so a comment between two expressions
+    # is shown as a leading comment on the following one instead of being
+    # dropped (it belongs to neither expression's own line range).
+    function _mwe_find_display_start_line(_mwe_src_lines, _mwe_from_line, _mwe_stop_line)
+        _mwe_line = _mwe_from_line
+        while _mwe_line < _mwe_stop_line && isempty(strip(_mwe_src_lines[_mwe_line]))
+            _mwe_line += 1
+        end
+        return _mwe_line
+    end
+    # End line of the *last* expression: trims trailing blank lines only (unlike
+    # `_mwe_find_expr_end_line`, comments are kept -- there is no following
+    # expression to reclaim them via `_mwe_find_display_start_line`).
+    function _mwe_find_final_end_line(_mwe_src_lines, _mwe_start_line, _mwe_nominal_end)
+        _mwe_end = _mwe_nominal_end
+        while _mwe_end >= _mwe_start_line && isempty(strip(_mwe_src_lines[_mwe_end]))
+            _mwe_end -= 1
+        end
+        return max(_mwe_end, _mwe_start_line)
+    end
     $plot_setup
     const _mwe_code = $(repr(code_str))
     const _mwe_src_lines = split(_mwe_code, '\\n')
@@ -600,14 +703,34 @@ function _build_driver_script(
         end
     end
 
+    # Precompute each expression's trimmed end line, then derive its display
+    # start: the first item keeps the whole leading region; later items start
+    # right after the previous item's end, reclaiming any comment left in the gap.
+    _mwe_end_lines = Int[]
+    for (i, (_mwe_start, _)) in enumerate(_mwe_items)
+        if i < length(_mwe_items)
+            _mwe_nominal_end = _mwe_items[i + 1][1] - 1
+            push!(_mwe_end_lines, _mwe_find_expr_end_line(_mwe_src_lines, _mwe_start, _mwe_nominal_end))
+        else
+            push!(
+                _mwe_end_lines,
+                _mwe_find_final_end_line(_mwe_src_lines, _mwe_start, length(_mwe_src_lines)),
+            )
+        end
+    end
+    _mwe_display_starts = [
+        i == 1 ? 1 :
+        _mwe_find_display_start_line(_mwe_src_lines, _mwe_end_lines[i - 1] + 1, _mwe_items[i][1])
+        for i in 1:length(_mwe_items)
+    ]
+
     for (i, (_mwe_start, _mwe_node)) in enumerate(_mwe_items)
         if _mwe_node isa Expr && _mwe_node.head === :error
             _mwe_prefix_output("ERROR: " * sprint(showerror, _mwe_node.args[1]))
             break
         end
-        _mwe_nominal_end = i < length(_mwe_items) ? _mwe_items[i + 1][1] - 1 : length(_mwe_src_lines)
-        _mwe_end = _mwe_find_expr_end_line(_mwe_src_lines, _mwe_start, _mwe_nominal_end)
-        _mwe_chunk = rstrip(join(_mwe_src_lines[_mwe_start:_mwe_end], '\\n'))
+        _mwe_end = _mwe_end_lines[i]
+        _mwe_chunk = rstrip(join(_mwe_src_lines[_mwe_display_starts[i]:_mwe_end], '\\n'))
         println(_mwe_chunk)
 
         _mwe_original_out = Base.stdout
@@ -852,6 +975,38 @@ function _find_expr_end_line(
     return max(end_line, start_line)
 end
 
+# Find where an expression's *displayed* source should start: right after the
+# previous expression's (trimmed) end, skipping over any purely blank lines but
+# stopping at the first comment line. This lets a comment sitting between two
+# expressions be shown as a leading comment on the following expression instead
+# of being silently dropped (it belongs to neither expression's own line range).
+function _find_display_start_line(
+    src_lines::Vector{<:AbstractString},
+    from_line::Int,
+    stop_line::Int,
+)
+    line = from_line
+    while line < stop_line && isempty(strip(src_lines[line]))
+        line += 1
+    end
+    return line
+end
+
+# Find the end line of the *last* expression in the source: trims trailing
+# blank lines only (unlike `_find_expr_end_line`, comment lines are kept, since
+# there is no following expression to reclaim them via `_find_display_start_line`).
+function _find_final_end_line(
+    src_lines::Vector{<:AbstractString},
+    start_line::Int,
+    nominal_end_line::Int,
+)
+    end_line = nominal_end_line
+    while end_line >= start_line && isempty(strip(src_lines[end_line]))
+        end_line -= 1
+    end
+    return max(end_line, start_line)
+end
+
 function _format_error(ce::CapturedError; stacktrace::Bool = false)
     stacktrace || return sprint(showerror, ce.exception)
     frames = _user_frames(ce.backtrace)
@@ -876,6 +1031,24 @@ function _execute_code_in_current_process(
             end
         end
     end
+    # Precompute each expression's trimmed end line (independent of evaluation),
+    # then derive its *display* start: the first item keeps the whole leading
+    # region (so comments before it are preserved, as before); later items start
+    # right after the previous item's end, reclaiming any comment left in the gap
+    # instead of it being dropped.
+    end_lines = Int[]
+    for (i, (start_line, _)) in enumerate(items)
+        if i < length(items)
+            nominal_end = items[i+1][1] - 1
+            push!(end_lines, _find_expr_end_line(src_lines, start_line, nominal_end))
+        else
+            push!(end_lines, _find_final_end_line(src_lines, start_line, length(src_lines)))
+        end
+    end
+    display_starts = [
+        i == 1 ? 1 : _find_display_start_line(src_lines, end_lines[i-1] + 1, items[i][1]) for
+        i = 1:length(items)
+    ]
     plot_count = Ref(0)
     pending_plots = String[]
     save_plot = function (x)
@@ -895,9 +1068,8 @@ function _execute_code_in_current_process(
                 _prefix_lines(buf, "ERROR: " * sprint(showerror, node.args[1]), "#> ")
                 break
             end
-            nominal_end = i < length(items) ? items[i+1][1] - 1 : length(src_lines)
-            end_line = _find_expr_end_line(src_lines, start_line, nominal_end)
-            ex_str = rstrip(join(src_lines[start_line:end_line], '\n'))
+            end_line = end_lines[i]
+            ex_str = rstrip(join(src_lines[display_starts[i]:end_line], '\n'))
             result = _capture_eval(node)
             println(buf, ex_str)
             _prefix_lines(buf, result.stdout, "#> ")

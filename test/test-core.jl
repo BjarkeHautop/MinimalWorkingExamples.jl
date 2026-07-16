@@ -501,6 +501,94 @@ end
     @test contains(result.md, "#> 2")
 end
 
+@testitem "comment between two expressions attaches to the following expression" tags=[
+    :unit,
+    :fast,
+] begin
+    result = mwe(
+        "1 + 1\n# comment\nprintln(2)";
+        temp = false,
+        newprocess = false,
+        advertise = false,
+    )
+    @test result isa MWEResult
+    lines = split(result.md, '\n')
+    idx = findfirst(l -> contains(l, "# comment"), lines)
+    @test !isnothing(idx)
+    @test contains(lines[idx+1], "println(2)")
+end
+
+@testitem "trailing comment after the final expression is preserved" tags=[:unit, :fast] begin
+    result =
+        mwe("1 + 1\n2 + 2\n# comment"; temp = false, newprocess = false, advertise = false)
+    @test result isa MWEResult
+    lines = split(result.md, '\n')
+    idx = findfirst(l -> contains(l, "2 + 2"), lines)
+    @test !isnothing(idx)
+    @test contains(lines[idx+1], "# comment")
+end
+
+@testitem "mwe_rescue() preserves a trailing comment after the last expression" tags=[
+    :unit,
+    :fast,
+] begin
+    transcript = """
+    julia> 1 + 1
+    2
+
+    julia> 2 + 2
+    4
+
+    julia> # trailing comment
+    """
+    result = mwe_rescue(transcript; temp = false, newprocess = false, advertise = false)
+    @test result isa MWEResult
+    @test contains(result.md, "# trailing comment")
+    @test !contains(result.md, "julia>")
+end
+
+@testitem "mwe_rescue() strips prompts and output from a REPL transcript" tags=[
+    :unit,
+    :fast,
+] begin
+    transcript = """
+    julia> 1 + 1
+    2
+
+    julia> # comment
+
+    julia> 1 + 3
+    4
+    """
+    result = mwe_rescue(transcript; temp = false, newprocess = false, advertise = false)
+    @test result isa MWEResult
+    @test contains(result.md, "1 + 1")
+    @test contains(result.md, "# comment")
+    @test contains(result.md, "1 + 3")
+    @test !contains(result.md, "julia>")
+    @test !contains(result.md, "2\n")  # printed output line was stripped
+    @test contains(result.md, "#> 4")
+end
+
+@testitem "mwe_rescue() dedents multiline continuation prompts" tags=[:unit, :fast] begin
+    transcript = """
+    julia> function f(x)
+               x + 1
+           end
+    f (generic function with 1 method)
+
+    julia> f(1)
+    2
+    """
+    result = mwe_rescue(transcript; temp = false, newprocess = false, advertise = false)
+    @test result isa MWEResult
+    @test contains(result.md, "function f(x)")
+    @test contains(result.md, "    x + 1")
+    @test contains(result.md, "end")
+    @test !contains(result.md, "julia>")
+    @test contains(result.md, "#> 2")
+end
+
 @testitem "trailing comment-only lines are not included in expression output" tags=[
     :unit,
     :fast,
