@@ -721,7 +721,7 @@ function _build_driver_script(
     _mwe_display_starts = [
         i == 1 ? 1 :
         _mwe_find_display_start_line(_mwe_src_lines, _mwe_end_lines[i - 1] + 1, _mwe_items[i][1])
-        for i in 1:length(_mwe_items)
+        for i in eachindex(_mwe_items)
     ]
 
     for (i, (_mwe_start, _mwe_node)) in enumerate(_mwe_items)
@@ -1047,7 +1047,7 @@ function _execute_code_in_current_process(
     end
     display_starts = [
         i == 1 ? 1 : _find_display_start_line(src_lines, end_lines[i-1] + 1, items[i][1]) for
-        i = 1:length(items)
+        i in eachindex(items)
     ]
     plot_count = Ref(0)
     pending_plots = String[]
@@ -1063,7 +1063,7 @@ function _execute_code_in_current_process(
     sink = isnothing(plot_dir) ? nothing : _PlotSink(save_plot)
     isnothing(sink) || pushdisplay(sink)
     try
-        for (i, (start_line, node)) in enumerate(items)
+        for (i, (_, node)) in enumerate(items)
             if node isa Expr && node.head === :error
                 _prefix_lines(buf, "ERROR: " * sprint(showerror, node.args[1]), "#> ")
                 break
@@ -1142,9 +1142,9 @@ function _run_in_current_process(
             original_project = Base.active_project()
             try
                 Pkg.activate(tmpdir)
-                temp_output, stacktrace_str =
+                temp_output, temp_stacktrace_str =
                     _execute_code_in_current_process(code_str; plot_dir)
-                return temp_output, "", env_str(), stacktrace_str
+                return temp_output, "", env_str(), temp_stacktrace_str
             finally
                 if isnothing(original_project)
                     Pkg.activate()
