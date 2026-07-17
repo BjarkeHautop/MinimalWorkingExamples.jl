@@ -1020,7 +1020,7 @@ function _execute_code_in_current_process(
 )
     buf = IOBuffer()
     stacktrace_str = ""
-    src_lines = split(code_str, '\n')
+    src_lines = split(String(code_str)::String, '\n')
     items = Tuple{Int,Any}[]
     let cur_line = 1
         for n in Meta.parseall(code_str).args
