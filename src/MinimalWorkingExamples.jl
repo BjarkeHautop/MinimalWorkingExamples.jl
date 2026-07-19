@@ -663,21 +663,9 @@ function _build_driver_script(
         end
         return max(_mwe_end, _mwe_start_line)
     end
-    # Find where an expression's *displayed* source should start: right after the
-    # previous expression's (trimmed) end, skipping purely blank lines but
-    # stopping at the first comment line, so a comment between two expressions
-    # is shown as a leading comment on the following one instead of being
-    # dropped (it belongs to neither expression's own line range).
-    function _mwe_find_display_start_line(_mwe_src_lines, _mwe_from_line, _mwe_stop_line)
-        _mwe_line = _mwe_from_line
-        while _mwe_line < _mwe_stop_line && isempty(strip(_mwe_src_lines[_mwe_line]))
-            _mwe_line += 1
-        end
-        return _mwe_line
-    end
     # End line of the *last* expression: trims trailing blank lines only (unlike
     # `_mwe_find_expr_end_line`, comments are kept -- there is no following
-    # expression to reclaim them via `_mwe_find_display_start_line`).
+    # expression to reclaim them).
     function _mwe_find_final_end_line(_mwe_src_lines, _mwe_start_line, _mwe_nominal_end)
         _mwe_end = _mwe_nominal_end
         while _mwe_end >= _mwe_start_line && isempty(strip(_mwe_src_lines[_mwe_end]))
@@ -705,7 +693,8 @@ function _build_driver_script(
 
     # Precompute each expression's trimmed end line, then derive its display
     # start: the first item keeps the whole leading region; later items start
-    # right after the previous item's end, reclaiming any comment left in the gap.
+    # right after the previous item's end, so anything left in the gap
+    # (comments and/or blank lines) is preserved.
     _mwe_end_lines = Int[]
     for (i, (_mwe_start, _)) in enumerate(_mwe_items)
         if i < length(_mwe_items)
@@ -718,11 +707,8 @@ function _build_driver_script(
             )
         end
     end
-    _mwe_display_starts = [
-        i == 1 ? 1 :
-        _mwe_find_display_start_line(_mwe_src_lines, _mwe_end_lines[i - 1] + 1, _mwe_items[i][1])
-        for i in eachindex(_mwe_items)
-    ]
+    _mwe_display_starts =
+        [i == 1 ? 1 : _mwe_end_lines[i - 1] + 1 for i in eachindex(_mwe_items)]
 
     for (i, (_mwe_start, _mwe_node)) in enumerate(_mwe_items)
         if _mwe_node isa Expr && _mwe_node.head === :error
@@ -975,26 +961,9 @@ function _find_expr_end_line(
     return max(end_line, start_line)
 end
 
-# Find where an expression's *displayed* source should start: right after the
-# previous expression's (trimmed) end, skipping over any purely blank lines but
-# stopping at the first comment line. This lets a comment sitting between two
-# expressions be shown as a leading comment on the following expression instead
-# of being silently dropped (it belongs to neither expression's own line range).
-function _find_display_start_line(
-    src_lines::Vector{<:AbstractString},
-    from_line::Int,
-    stop_line::Int,
-)
-    line = from_line
-    while line < stop_line && isempty(strip(src_lines[line]))
-        line += 1
-    end
-    return line
-end
-
 # Find the end line of the *last* expression in the source: trims trailing
 # blank lines only (unlike `_find_expr_end_line`, comment lines are kept, since
-# there is no following expression to reclaim them via `_find_display_start_line`).
+# there is no following expression to reclaim them).
 function _find_final_end_line(
     src_lines::Vector{<:AbstractString},
     start_line::Int,
@@ -1034,8 +1003,8 @@ function _execute_code_in_current_process(
     # Precompute each expression's trimmed end line (independent of evaluation),
     # then derive its *display* start: the first item keeps the whole leading
     # region (so comments before it are preserved, as before); later items start
-    # right after the previous item's end, reclaiming any comment left in the gap
-    # instead of it being dropped.
+    # right after the previous item's end, so anything left in the gap (comments
+    # and/or blank lines) is preserved instead of being dropped.
     end_lines = Int[]
     for (i, (start_line, _)) in enumerate(items)
         if i < length(items)
@@ -1045,10 +1014,7 @@ function _execute_code_in_current_process(
             push!(end_lines, _find_final_end_line(src_lines, start_line, length(src_lines)))
         end
     end
-    display_starts = [
-        i == 1 ? 1 : _find_display_start_line(src_lines, end_lines[i-1] + 1, items[i][1]) for
-        i in eachindex(items)
-    ]
+    display_starts = [i == 1 ? 1 : end_lines[i-1] + 1 for i in eachindex(items)]
     plot_count = Ref(0)
     pending_plots = String[]
     save_plot = function (x)

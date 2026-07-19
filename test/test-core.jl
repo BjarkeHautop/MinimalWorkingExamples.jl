@@ -589,6 +589,16 @@ end
     @test contains(result.md, "#> 2")
 end
 
+@testitem "blank line between two expressions is preserved" tags=[:unit, :fast] begin
+    result = mwe("1+1\n\n2+2"; temp = false, newprocess = false, advertise = false)
+    @test result isa MWEResult
+    lines = split(result.md, '\n')
+    idx = findfirst(==("1+1"), lines)
+    @test !isnothing(idx)
+    @test isempty(lines[idx+1])
+    @test lines[idx+2] == "2+2"
+end
+
 @testitem "trailing comment-only lines are not included in expression output" tags=[
     :unit,
     :fast,
