@@ -73,6 +73,19 @@ end
     @test contains(result.md, "#> 2")      # last value shown
 end
 
+@testitem "last expression that already printed is not shown again" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "x = 5\n@show x";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+    )
+    @test contains(result.md, "#> x = 5")
+    @test !contains(result.md, "#> 5")  # value not shown a second time
+end
+
 @testitem "nothing-returning expressions produce no #>" tags=[:unit, :fast] begin
     result = MinimalWorkingExamples._run_mwe(
         "x = nothing";
@@ -705,6 +718,18 @@ end
     @test result isa MWEResult
     @test contains(result.md, "#> 42")
     @test !contains(result.md, "#> 5")
+end
+
+@testitem "@mwe: last expression that already printed is not shown again (newprocess)" tags=[
+    :integration,
+    :slow,
+] begin
+    result = @mwe begin
+        x = 5
+        @show x
+    end temp=false newprocess=true manifest=false advertise=false
+    @test contains(result.md, "#> x = 5")
+    @test !contains(result.md, "#> 5")  # value not shown a second time
 end
 
 @testitem "@mwe: manifest=false omits details block" tags=[:integration, :slow] begin

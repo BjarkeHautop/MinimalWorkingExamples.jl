@@ -765,7 +765,7 @@ function _build_driver_script(
             end
             break
         end
-        if i == length(_mwe_items) && _mwe_val !== nothing
+        if i == length(_mwe_items) && _mwe_val !== nothing && isempty(_mwe_captured_out)
             _mwe_buf = IOBuffer()
             show(IOContext(_mwe_buf, :limit => true, :color => false), MIME"text/plain"(), _mwe_val)
             _mwe_prefix_output(String(take!(_mwe_buf)))
@@ -1071,7 +1071,7 @@ function _execute_code_in_current_process(
                 end
                 break
             end
-            if i == length(items) && value_to_show !== nothing
+            if i == length(items) && value_to_show !== nothing && isempty(result.stdout)
                 val_buf = IOBuffer()
                 show(
                     IOContext(val_buf, :limit => true, :color => false),
