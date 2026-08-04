@@ -3,9 +3,9 @@ exclude = [
   "@cite",
   "^https://github.com/.*/releases/tag/v.*$",
   "^https://doi.org/FIXME$",
-  "^https://BjarkeHautop.github.io/MinimalWorkingExamples.jl/stable$",
 
-  "zenodo.org/badge/DOI/FIXME$"
+  "zenodo.org/badge/DOI/FIXME$",
+  "^https://stackoverflow\\.com"
 ]
 
 exclude_path = [
