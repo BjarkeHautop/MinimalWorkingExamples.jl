@@ -159,7 +159,7 @@ end
     chmod(fake_opener, 0o755)
 
     old_path = ENV["PATH"]
-    ENV["PATH"] = dir * ":" * old_path
+    ENV["PATH"] = dir * (Sys.iswindows() ? ";" : ":") * old_path
     try
         @test _open_in_browser("/tmp/whatever.html") == true
     finally
@@ -173,12 +173,17 @@ end
 ] begin
     using MinimalWorkingExamples: _open_in_browser
 
-    old_path = ENV["PATH"]
-    ENV["PATH"] = ""
-    try
-        @test _open_in_browser("/tmp/whatever.html") == false
-    finally
-        ENV["PATH"] = old_path
+    # On Windows, `_open_in_browser` shells out via `cmd /c start`, and `cmd.exe` is
+    # resolved through the system directories regardless of `PATH`, so an "opener not
+    # found" scenario can't be simulated by clearing `PATH` like on Unix.
+    if !Sys.iswindows()
+        old_path = ENV["PATH"]
+        ENV["PATH"] = ""
+        try
+            @test _open_in_browser("/tmp/whatever.html") == false
+        finally
+            ENV["PATH"] = old_path
+        end
     end
 end
 
@@ -204,7 +209,7 @@ end
     chmod(fake_opener, 0o755)
 
     old_path = ENV["PATH"]
-    ENV["PATH"] = dir * ":" * old_path
+    ENV["PATH"] = dir * (Sys.iswindows() ? ";" : ":") * old_path
     try
         @test_logs (:info, "Preview opened in browser.") preview(result)
     finally
@@ -215,15 +220,20 @@ end
 @testitem "preview: reports failure when nothing can display the result" tags=[:unit, :fast] begin
     using MinimalWorkingExamples: preview, MWEResult
 
-    @test !isdefined(Main, :VSCodeServer)
-    result = MWEResult("Hello **world**")
+    # See the matching note on the `_open_in_browser` tests: on Windows the
+    # browser-opener command is always resolvable regardless of `PATH`, so `preview`
+    # can't be forced into the "nothing can display the result" branch this way.
+    if !Sys.iswindows()
+        @test !isdefined(Main, :VSCodeServer)
+        result = MWEResult("Hello **world**")
 
-    old_path = ENV["PATH"]
-    ENV["PATH"] = ""
-    try
-        @test_logs (:info, r"Could not open a browser") preview(result)
-    finally
-        ENV["PATH"] = old_path
+        old_path = ENV["PATH"]
+        ENV["PATH"] = ""
+        try
+            @test_logs (:info, r"Could not open a browser") preview(result)
+        finally
+            ENV["PATH"] = old_path
+        end
     end
 end
 

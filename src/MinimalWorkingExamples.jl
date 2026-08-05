@@ -430,21 +430,18 @@ function _spec_name(spec::Pkg.PackageSpec)
     n = try
         spec.name
     catch
-        ;
         nothing
     end
     !isnothing(n) && !isempty(n) && return n
     src = try
         spec.url
     catch
-        ;
         nothing
     end
     if isnothing(src)
         src = try
             spec.path
         catch
-            ;
             nothing
         end
     end
@@ -459,7 +456,6 @@ function _repr_packagespec(spec::Pkg.PackageSpec)
         try
             f()
         catch
-            ;
             nothing
         end
 
@@ -495,17 +491,16 @@ function _describe_packagespec(spec::Pkg.PackageSpec)
         try
             f()
         catch
-            ;
             nothing
         end
 
-    name = let n = _spec_name(spec);
+    name = let n = _spec_name(spec)
         isnothing(n) ? "?" : n
     end
 
     v = _get(() -> spec.version)
     v_str = if !isnothing(v)
-        s = string(v);
+        s = string(v)
         (isempty(s) || s == "*") ? nothing : s
     end
 
