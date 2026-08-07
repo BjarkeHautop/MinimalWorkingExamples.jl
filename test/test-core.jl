@@ -714,6 +714,77 @@ end
     @test _describe_packagespec(PackageSpec(name = "Foo", rev = "main")) == "Foo#main"
 end
 
+# ── _format_error ──────────────────────────────────────────────────────────────
+
+@testitem "_format_error: without stacktrace omits frames" tags=[:unit, :fast] begin
+    using MinimalWorkingExamples: _format_error, CapturedError
+
+    ce = try
+        error("boom")
+    catch e
+        CapturedError(e, catch_backtrace())
+    end
+
+    msg = _format_error(ce)
+    @test contains(msg, "boom")
+    @test !contains(msg, "Stacktrace")
+end
+
+@testitem "_format_error: with stacktrace appends user frames" tags=[:unit, :fast] begin
+    using MinimalWorkingExamples: _format_error, CapturedError
+
+    ce = try
+        error("boom")
+    catch e
+        CapturedError(e, catch_backtrace())
+    end
+
+    msg = _format_error(ce; stacktrace = true)
+    @test contains(msg, "boom")
+    @test contains(msg, "Stacktrace")
+end
+
+@testitem "_format_error: with stacktrace but empty backtrace omits frames" tags=[
+    :unit,
+    :fast,
+] begin
+    using MinimalWorkingExamples: _format_error, CapturedError
+
+    ce = CapturedError(ErrorException("empty backtrace"), Ptr{Nothing}[])
+    msg = _format_error(ce; stacktrace = true)
+    @test msg == sprint(showerror, ErrorException("empty backtrace"))
+    @test !contains(msg, "Stacktrace")
+end
+
+# ── _suppresses_display ─────────────────────────────────────────────────────────
+
+@testitem "_suppresses_display: recognizes suppressed heads directly" tags=[:unit, :fast] begin
+    using MinimalWorkingExamples: _suppresses_display
+
+    @test _suppresses_display(:(x = 1))
+    @test _suppresses_display(:(function f() end))
+    @test _suppresses_display(:(struct S end))
+    @test !_suppresses_display(:(x + 1))
+    @test !_suppresses_display(:(println(x)))
+end
+
+@testitem "_suppresses_display: unwraps local/global/const wrappers" tags=[:unit, :fast] begin
+    using MinimalWorkingExamples: _suppresses_display
+
+    @test _suppresses_display(:(local x = 1))
+    @test _suppresses_display(:(global x = 1))
+    @test _suppresses_display(:(const x = 1))
+    @test _suppresses_display(:(local function f() end))
+    @test !_suppresses_display(Expr(:local, :(x + 1)))
+end
+
+@testitem "_suppresses_display: unwraps multiple nested wrappers" tags=[:unit, :fast] begin
+    using MinimalWorkingExamples: _suppresses_display
+
+    nested = Expr(:local, Expr(:global, Expr(:const, :(x = 1))))
+    @test _suppresses_display(nested)
+end
+
 # ── sandbox isolation ─────────────────────────────────────────────────────────
 
 @testitem "sandbox: subprocess LOAD_PATH excludes global environment" tags=[
@@ -1011,6 +1082,58 @@ end
     @test _spec_name(spec) == "Example"
 end
 
+@testitem "_spec_name: falls through to nothing when name/url/path are all unset" tags=[
+    :unit,
+    :fast,
+] begin
+    using Pkg
+    using MinimalWorkingExamples: _spec_name
+    @test isnothing(_spec_name(Pkg.PackageSpec()))
+end
+
+@testitem "_repr_packagespec: round-trips all fields" tags=[:unit, :fast] begin
+    using Pkg
+    using MinimalWorkingExamples: _repr_packagespec
+    spec = Pkg.PackageSpec(name = "Example", version = "0.5.3")
+    s = _repr_packagespec(spec)
+    @test contains(s, "Pkg.PackageSpec(")
+    @test contains(s, "name=\"Example\"")
+    @test contains(s, "version=\"0.5.3\"")
+end
+
+@testitem "_repr_packagespec: url and rev" tags=[:unit, :fast] begin
+    using Pkg
+    using MinimalWorkingExamples: _repr_packagespec
+    spec = Pkg.PackageSpec(url = "https://github.com/JuliaLang/Example.jl", rev = "main")
+    s = _repr_packagespec(spec)
+    @test contains(s, "url=\"https://github.com/JuliaLang/Example.jl\"")
+    @test contains(s, "rev=\"main\"")
+end
+
+@testitem "_repr_packagespec: path and subdir" tags=[:unit, :fast] begin
+    using Pkg
+    using MinimalWorkingExamples: _repr_packagespec
+    spec = Pkg.PackageSpec(path = "/path/to/Example.jl", subdir = "sub")
+    s = _repr_packagespec(spec)
+    @test contains(s, "path=\"/path/to/Example.jl\"")
+    @test contains(s, "subdir=\"sub\"")
+end
+
+@testitem "_repr_packagespec: no fields set yields empty argument list" tags=[:unit, :fast] begin
+    using Pkg
+    using MinimalWorkingExamples: _repr_packagespec
+    @test _repr_packagespec(Pkg.PackageSpec()) == "Pkg.PackageSpec()"
+end
+
+@testitem "_describe_packagespec: no identifying fields falls back to '?'" tags=[
+    :unit,
+    :fast,
+] begin
+    using Pkg
+    using MinimalWorkingExamples: _describe_packagespec
+    @test _describe_packagespec(Pkg.PackageSpec()) == "?"
+end
+
 @testitem "footer includes 'current environment' note when temp=false" tags=[:unit, :fast] begin
     result = MinimalWorkingExamples._run_mwe(
         "1 + 1";
@@ -1080,5 +1203,24 @@ end
         set_defaults!(venue = nothing, temp = nothing)
         @test MinimalWorkingExamples._defaults().venue == :gh
         @test MinimalWorkingExamples._defaults().temp == true
+    end
+end
+
+@testitem "set_defaults! validates and persists preview" tags=[:unit, :fast] begin
+    using Pkg
+
+    mktempdir() do dir
+        Pkg.activate(dir; io = devnull)
+
+        @test_throws ArgumentError set_defaults!(preview = :bogus)
+
+        set_defaults!(preview = :editor)
+        @test MinimalWorkingExamples._defaults().preview == :editor
+
+        set_defaults!(preview = false)
+        @test MinimalWorkingExamples._defaults().preview == false
+
+        set_defaults!(preview = nothing)
+        @test MinimalWorkingExamples._defaults().preview === nothing
     end
 end
