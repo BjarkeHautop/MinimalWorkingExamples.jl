@@ -55,7 +55,7 @@ mean(x)
 ```
 ````
 
-The value of the last expression is shown as `#>`, as are any `print` calls and log messages (`@warn`, `@info`) in the code.
+The value of each statement is shown as `#>` (assignments and definitions like `function`/`struct` are skipped), as are any `print` calls and log messages (`@warn`, `@info`) in the code.
 
 ## Contributing
 

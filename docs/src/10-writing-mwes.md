@@ -36,7 +36,6 @@ You want the reader to get the *same* result you did.
 
 ## Make the problem obvious
 
-- Arrange the code so the **final expression** is the surprising part, e.g. a wrong value or an error.
 - If the result merely *looks* wrong, say what you expected in the surrounding text.
 
 ## Further reading

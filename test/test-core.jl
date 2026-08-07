@@ -35,7 +35,7 @@ end
     @test !contains(result.md, "julia>")
 end
 
-@testitem "intermediate expressions produce no #> for return value" tags=[:unit, :fast] begin
+@testitem "intermediate assignment produces no #> for return value" tags=[:unit, :fast] begin
     result = MinimalWorkingExamples._run_mwe(
         "x = 42\nx * 2";
         temp = false,
@@ -45,9 +45,50 @@ end
         packagespecs = [],
     )
     @test contains(result.md, "x = 42")
-    @test !contains(result.md, "#> 42")  # not the last expression
+    @test !contains(result.md, "#> 42")  # assignment, never echoed
     @test contains(result.md, "x * 2")
-    @test contains(result.md, "#> 84")   # last expression
+    @test contains(result.md, "#> 84")
+end
+
+@testitem "non-final, non-assignment expressions also show #>" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "1 + 1\n2 + 2";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+    )
+    @test contains(result.md, "#> 2")  # first expression's value, not just the last
+    @test contains(result.md, "#> 4")
+end
+
+@testitem "definitions produce no #> even when not the last expression" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "struct MWETestFoo\nx::Int\nend\nfunction mwe_test_f(x)\nx + 1\nend\n1 + 1";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+    )
+    @test !contains(result.md, "#> MWETestFoo")
+    @test !contains(result.md, "#> mwe_test_f")
+    @test contains(result.md, "#> 2")
+end
+
+@testitem "mid-block expression that already printed is not shown again" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "@show 10\n99";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+    )
+    @test contains(result.md, "#> 10 = 10")
+    @test !contains(result.md, "#> 10\n")  # value not echoed a second time on its own line
+    @test contains(result.md, "#> 99")
 end
 
 @testitem "final bare literal shown as #> (in-process)" tags=[:unit, :fast] begin
@@ -71,6 +112,32 @@ end
     )
     @test contains(result.md, "#> hello")  # stdout always shown
     @test contains(result.md, "#> 2")      # last value shown
+end
+
+@testitem "raw ANSI escapes in stdout are stripped (in-process)" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "print(\"\\e[48;5;235m ♖ \\e[0m\")";
+        temp = false,
+        newprocess = false,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+    )
+    @test contains(result.md, "#>  ♖")
+    @test !contains(result.md, "\e[")
+end
+
+@testitem "raw ANSI escapes in stdout are stripped (new process)" tags=[:unit, :fast] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "print(\"\\e[48;5;235m ♖ \\e[0m\")";
+        temp = false,
+        newprocess = true,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+    )
+    @test contains(result.md, "#>  ♖")
+    @test !contains(result.md, "\e[")
 end
 
 @testitem "last expression that already printed is not shown again" tags=[:unit, :fast] begin
@@ -579,7 +646,7 @@ end
     @test contains(result.md, "# comment")
     @test contains(result.md, "1 + 3")
     @test !contains(result.md, "julia>")
-    @test !contains(result.md, "2\n")  # printed output line was stripped
+    @test contains(result.md, "#> 2")  # value of the first expression, now echoed too
     @test contains(result.md, "#> 4")
 end
 
@@ -608,8 +675,9 @@ end
     lines = split(result.md, '\n')
     idx = findfirst(==("1+1"), lines)
     @test !isnothing(idx)
-    @test isempty(lines[idx+1])
-    @test lines[idx+2] == "2+2"
+    @test lines[idx+1] == "#> 2"  # first expression's value is now echoed too
+    @test isempty(lines[idx+2])
+    @test lines[idx+3] == "2+2"
 end
 
 @testitem "trailing comment-only lines are not included in expression output" tags=[
@@ -693,6 +761,39 @@ end
     @test contains(result.md, "x * 2")
     @test contains(result.md, "#> 84")
     @test startswith(result.md, "```julia")
+end
+
+@testitem "newprocess=true: non-final, non-assignment expressions also show #>" tags=[
+    :integration,
+    :slow,
+] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "1 + 1\n2 + 2";
+        temp = false,
+        newprocess = true,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+    )
+    @test contains(result.md, "#> 2")
+    @test contains(result.md, "#> 4")
+end
+
+@testitem "newprocess=true: definitions produce no #> even when not the last expression" tags=[
+    :integration,
+    :slow,
+] begin
+    result = MinimalWorkingExamples._run_mwe(
+        "struct MWETestFoo\nx::Int\nend\nfunction mwe_test_f(x)\nx + 1\nend\n1 + 1";
+        temp = false,
+        newprocess = true,
+        manifest = false,
+        advertise = false,
+        packagespecs = [],
+    )
+    @test !contains(result.md, "#> MWETestFoo")
+    @test !contains(result.md, "#> mwe_test_f")
+    @test contains(result.md, "#> 2")
 end
 
 # ── @mwe macro tests ──────────────────────────────────────────────────────────

@@ -122,8 +122,9 @@ end
 
 Generate a Minimal Working Example (MWE) formatted as Markdown, then copy it to the clipboard.
 
-The code is rendered as a copy-pasteable Julia script with the output of the final expression
-(and any `print`/logging calls) shown as `#>` comments.
+The code is rendered as a copy-pasteable Julia script with the value of each statement
+shown as a `#>` comment, alongside any `print`/logging output. Assignments and definitions
+(`function`, `struct`, `module`, etc.) are not echoed.
 
 # Keyword arguments
 - `venue=:gh`: output format — `:gh` for GitHub-Flavored Markdown (default), `:discord` for Discord
@@ -641,8 +642,10 @@ function _build_driver_script(
     return """
     using Logging
 
+    const _mwe_ansi_re = r"\\e\\[[0-9;]*[A-Za-z]"
     function _mwe_prefix_output(str)
         isempty(str) && return
+        str = replace(str, _mwe_ansi_re => "")
         for line in split(rstrip(str, '\\n'), '\\n')
             println("#> ", line)
         end
@@ -667,6 +670,14 @@ function _build_driver_script(
             _mwe_end -= 1
         end
         return max(_mwe_end, _mwe_start_line)
+    end
+    const _MWE_SUPPRESSED_HEADS =
+        (:(=), :function, :struct, :abstract, :primitive, :module, :macro)
+    function _mwe_suppresses_display(ex)
+        while ex isa Expr && ex.head in (:local, :global, :const)
+            ex = ex.args[1]
+        end
+        return ex isa Expr && ex.head in _MWE_SUPPRESSED_HEADS
     end
     $plot_setup
     const _mwe_code = $(repr(code_str))
@@ -760,7 +771,9 @@ function _build_driver_script(
             end
             break
         end
-        if i == length(_mwe_items) && _mwe_val !== nothing && isempty(_mwe_captured_out)
+        if !_mwe_suppresses_display(_mwe_node) &&
+           _mwe_val !== nothing &&
+           isempty(_mwe_captured_out)
             _mwe_buf = IOBuffer()
             show(IOContext(_mwe_buf, :limit => true, :color => false), MIME"text/plain"(), _mwe_val)
             _mwe_prefix_output(String(take!(_mwe_buf)))
@@ -920,9 +933,16 @@ function _capture_eval(ex)
     return EvalResult(val, captured_out, captured_err, captured_error)
 end
 
+# Packages sometimes print raw ANSI escapes (e.g. terminal color codes) straight to
+# stdout, bypassing Julia's own color system entirely — so the `:color => false`
+# IOContext used for `show`n values can't suppress them. Strip them here instead,
+# since the rendered `#>` line is plain text (Markdown code fence / preview HTML).
+const _ANSI_RE = r"\e\[[0-9;]*[A-Za-z]"
+_strip_ansi(s::AbstractString) = replace(s, _ANSI_RE => "")
+
 function _prefix_lines(io::IO, str::AbstractString, prefix::AbstractString)
     isempty(str) && return
-    for line in split(rstrip(str, '\n'), '\n')
+    for line in split(rstrip(_strip_ansi(str), '\n'), '\n')
         println(io, prefix, line)
     end
 end
@@ -976,6 +996,19 @@ function _format_error(ce::CapturedError; stacktrace::Bool = false)
     frames = _user_frames(ce.backtrace)
     st = isempty(frames) ? "" : "\n" * sprint(Base.show_backtrace, frames)
     return sprint(showerror, ce.exception) * st
+end
+
+# Expression heads whose value is a byproduct of binding a name (assignment) or
+# declaring something (function/type/module), not a value the user asked to see.
+# Short-form function definitions (`f(x) = x + 1`) also parse to `:(=)`.
+const _MWE_SUPPRESSED_HEADS =
+    (:(=), :function, :struct, :abstract, :primitive, :module, :macro)
+
+function _suppresses_display(ex)
+    while ex isa Expr && ex.head in (:local, :global, :const)
+        ex = ex.args[1]
+    end
+    return ex isa Expr && ex.head in _MWE_SUPPRESSED_HEADS
 end
 
 function _execute_code_in_current_process(
@@ -1066,7 +1099,9 @@ function _execute_code_in_current_process(
                 end
                 break
             end
-            if i == length(items) && value_to_show !== nothing && isempty(result.stdout)
+            if !_suppresses_display(node) &&
+               value_to_show !== nothing &&
+               isempty(result.stdout)
                 val_buf = IOBuffer()
                 show(
                     IOContext(val_buf, :limit => true, :color => false),
