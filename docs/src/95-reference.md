@@ -16,6 +16,7 @@ Pages = ["95-reference.md"]
 @mwe
 mwe
 mwe_rescue
+mwe_invert
 MWEResult
 set_defaults!
 preview

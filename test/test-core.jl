@@ -669,6 +669,45 @@ end
     @test contains(result.md, "#> 2")
 end
 
+@testitem "mwe_invert() strips #> output lines" tags=[:unit, :fast] begin
+    rendered = """
+    1 + 1
+    #> 2
+
+    println("hi")
+    #> hi
+    """
+    code = mwe_invert(rendered)
+    @test code isa String
+    @test contains(code, "1 + 1")
+    @test contains(code, "println(\"hi\")")
+    @test !contains(code, "#>")
+end
+
+@testitem "mwe_invert() strips blank #> lines and unicode output" tags=[:unit, :fast] begin
+    rendered = """
+    show(stdout, MIME("text/plain"), @benchmark f1(10.0)); println()
+    #> BenchmarkTools.Trial: 10000 samples with 1 evaluation per sample.
+    #>
+    #>       █▇▄▃▁  ▁
+    #>  Memory estimate: 32 bytes, allocs estimate: 2.
+    show(stdout, MIME("text/plain"), @benchmark f2(10.0)); println()
+    """
+    code = mwe_invert(rendered)
+    @test !contains(code, "#>")
+    @test contains(code, "@benchmark f1(10.0)")
+    @test contains(code, "@benchmark f2(10.0)")
+    @test count("@benchmark", code) == 2
+end
+
+@testitem "mwe_invert() round-trips mwe() output" tags=[:unit, :fast] begin
+    result = mwe("2 + 2"; temp = false, newprocess = false, advertise = false)
+    fence_lines = split(result.md, '\n')[2:(end-1)]  # drop ```julia / ``` fence
+    code = mwe_invert(join(fence_lines, "\n"))
+    @test contains(code, "2 + 2")
+    @test !contains(code, "#>")
+end
+
 @testitem "blank line between two expressions is preserved" tags=[:unit, :fast] begin
     result = mwe("1+1\n\n2+2"; temp = false, newprocess = false, advertise = false)
     @test result isa MWEResult

@@ -7,7 +7,7 @@ using Pkg
 using InteractiveUtils: clipboard, versioninfo as interactive_versioninfo
 using Preferences: load_preference, set_preferences!
 
-export @mwe, MWEResult, mwe, mwe_rescue, preview, set_defaults!
+export @mwe, MWEResult, mwe, mwe_rescue, mwe_invert, preview, set_defaults!
 
 const _DEFAULTS = (
     venue = :gh,
@@ -354,6 +354,46 @@ function mwe_rescue(
         plot_dir,
         preview,
     )
+end
+
+"""
+    mwe_invert([text])
+
+Invert a rendered MWE back into plain code: drop every line that starts with
+`#>` (the output lines emitted by [`mwe`](@ref)/[`@mwe`](@ref)) and return
+what's left, unexecuted.
+
+If `text` is omitted, it is read from the clipboard — e.g. paste in the code
+block copied from a GitHub issue. The inverted code is copied back to the
+clipboard when possible.
+
+# Examples
+
+```julia
+mwe_invert(\"""
+1 + 1
+#> 2
+\""")
+```
+Returns `"1 + 1"`.
+"""
+function mwe_invert(text::AbstractString = clipboard())
+    lines = split(replace(text, "\r\n" => "\n"), '\n')
+    code = join((line for line in lines if !startswith(line, "#>")), "\n")
+
+    clipboard_ok = try
+        clipboard(code)
+        true
+    catch
+        false
+    end
+    if clipboard_ok
+        @info "Inverted code copied to clipboard!"
+    else
+        @info "Could not copy to clipboard — printing below."
+    end
+    (clipboard_ok && isinteractive()) || println(code)
+    return code
 end
 
 """
