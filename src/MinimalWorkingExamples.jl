@@ -862,9 +862,9 @@ function _setup_temp_env!(
         "JULIA_LOAD_PATH" => join(["@", "@stdlib"], Sys.iswindows() ? ";" : ":"),
     )
     if isempty(install_names)
-        @info "Instantiating environment..."
+        @info "Setting up environment..."
     else
-        @info "Installing packages: $(join(install_names, ", "))..."
+        @info "Setting up environment: $(join(install_names, ", "))..."
     end
     verbose ? run(cmd) : run(pipeline(cmd; stdout = devnull, stderr = devnull))
     @info "Running code..."
