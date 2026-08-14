@@ -13,8 +13,8 @@ Pages = ["95-reference.md"]
 ```
 
 ```@docs
-@mwe
 mwe
+@mwe
 mwe_rescue
 mwe_invert
 MWEResult

@@ -19,7 +19,7 @@ Minimal is not just polite: shrinking the example is often how you find the caus
 
 !!! note
 
-    By default, [`@mwe`](@ref) and [`mwe`](@ref) run your code in a temporary directory with a fresh Julia process and temporary package environment, not your current REPL session. Anything that only exists in your session will not be available.
+    By default, [`mwe`](@ref) and [`@mwe`](@ref) run your code in a temporary directory with a fresh Julia process and temporary package environment, not your current REPL session. Anything that only exists in your session will not be available.
 
 Therefore, your snippet must:
 

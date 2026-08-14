@@ -54,8 +54,8 @@ _defaults() = (; (k => _default(k) for k in keys(_DEFAULTS))...)
 """
     set_defaults!(; kwargs...)
 
-Persistently override the default keyword arguments of [`@mwe`](@ref) and
-[`mwe`](@ref) using [Preferences.jl](https://github.com/JuliaPackaging/Preferences.jl).
+Persistently override the default keyword arguments of [`mwe`](@ref) and
+[`@mwe`](@ref) using [Preferences.jl](https://github.com/JuliaPackaging/Preferences.jl).
 
 Any of `venue`, `temp`, `newprocess`, `manifest`, `advertise`, `verbose`,
 `versioninfo`, `julia_args`, `plot_dir`, and `preview` may be set.
@@ -115,56 +115,20 @@ end
 """
     @mwe begin
         code
-    end [venue=:gh] [temp=true] [newprocess=true] [manifest=false]
-        [advertise=nothing] [versioninfo=nothing] [preview=nothing]
-        [packagespecs=PackageSpec[]] [manifest_path=nothing] [verbose=false]
-        [julia_args=""] [plot_dir="MWEPlots"]
+    end [kwargs...]
 
-Generate a Minimal Working Example (MWE) formatted as Markdown, then copy it to the clipboard.
-
-The code is rendered as a copy-pasteable Julia script with the value of each statement
-shown as a `#>` comment, alongside any `print`/logging output. Assignments and definitions
-(`function`, `struct`, `module`, etc.) are not echoed.
+Macro form of [`mwe`](@ref). Takes the code as a `begin...end` block instead of a string,
+which is convenient for writing an MWE inline.
 
 # Keyword arguments
-- `venue=:gh`: output format — `:gh` for GitHub-Flavored Markdown (default), `:discord` for Discord
-  (same as `:gh` but the advertisement note uses Discord's `-# ` subtext syntax instead of `<sup>`),
-  `:slack` for Slack (strips the language identifier from the code fence).
-- `temp=true`: create a temporary isolated environment and auto-add packages from `using`/`import`.
-  When `false`, code runs in the current environment without auto-adding packages (to avoid
-  polluting the user's project).
-- `newprocess=true`: run the MWE in a fresh Julia process; startup files are disabled to ensure
-  reproducibility. If `newprocess=false`, the MWE runs in the current session. If also `temp=true`,
-  a temporary project is activated for the execution and then restored.
-- `manifest=false`: append the `Manifest.toml` in a collapsible `<details>` block.
-- `advertise=nothing`: append a footer noting the date, this package, and Julia version used.
-  If `nothing` (the default), this is `false` for `:slack` and `true` otherwise.
-- `versioninfo=nothing`: whether to append a collapsible "Environment" block showing the output
-  of `versioninfo()`. If `nothing` (the default), this is `true` for `:gh` and `false` otherwise.
-- `preview=nothing`: which viewer shows the rendered result (see [`preview`](@ref)) —
-  `:editor` (the host editor's viewer panel), `:browser`, or `false` (don't preview). If
-  `nothing` (the default), this is `false` in non-interactive sessions, otherwise `:editor`
-  when an editor viewer panel is available and `:browser` otherwise.
-- `packagespecs=PackageSpec[]`: vector of [`Pkg.PackageSpec`](https://pkgdocs.julialang.org/v1/api/#Pkg.PackageSpec)s for packages that need a specific
-  version, git revision, URL, or local path.
-- `manifest_path=nothing`: path to an existing `Manifest.toml` to use as-is.
-  Mutually exclusive with `packagespecs`.
-- `verbose=false`: if `true`, show Pkg output (downloads, resolver messages) during environment
-  setup.
-- `julia_args=""`: extra command-line flags passed through to the isolated Julia process, e.g.
-  `"-t 4"` or `"--check-bounds=no"`. Only valid when `newprocess=true`.
-- `plot_dir="MWEPlots"`: directory in which plots produced by the code are saved as PNGs.
-  A visible `**Insert plot here: ...**` placeholder marks each plot's position in the Markdown.
-  End a line with `;` to suppress capture for that expression.
+
+Accepts the same keyword arguments (with the same defaults) as [`mwe`](@ref), written
+after the block as `key=value` (no commas).
 
 !!! note
     The code block is rebuilt from its parsed AST, so comments and exact formatting are not
     preserved in the output. Use [`mwe`](@ref) if you need to preserve your code's formatting
     and comments.
-
-!!! tip
-    The defaults above (except `packagespecs` and `manifest_path`) can be changed
-    persistently with [`set_defaults!`](@ref).
 
 # Examples
 
@@ -213,14 +177,53 @@ macro mwe(ex, kwargs...)
 end
 
 """
-    mwe([code]; kwargs...)
+    mwe([code]; venue=:gh, temp=true, newprocess=true, manifest=false,
+        advertise=nothing, versioninfo=nothing, preview=nothing,
+        packagespecs=PackageSpec[], manifest_path=nothing, verbose=false,
+        julia_args="", plot_dir="MWEPlots")
 
-Function form of [`@mwe`](@ref). Accepts code as a plain string.
-If `code` is omitted, reads Julia source from the clipboard.
+Generate a Minimal Working Example (MWE) formatted as Markdown, then copy it to the clipboard.
+
+`code` is Julia source as a plain string; if omitted, it is read from the clipboard.
+The code is rendered as a copy-pasteable Julia script with the value of each statement
+shown as a `#>` comment, alongside any `print`/logging output. Assignments and definitions
+(`function`, `struct`, `module`, etc.) are not echoed. Comments and formatting are
+preserved as written.
 
 # Keyword arguments
+- `venue=:gh`: output format — `:gh` for GitHub-Flavored Markdown (default), `:discord` for Discord
+  (same as `:gh` but the advertisement note uses Discord's `-# ` subtext syntax instead of `<sup>`),
+  `:slack` for Slack (strips the language identifier from the code fence).
+- `temp=true`: create a temporary isolated environment and auto-add packages from `using`/`import`.
+  When `false`, code runs in the current environment without auto-adding packages (to avoid
+  polluting the user's project).
+- `newprocess=true`: run the MWE in a fresh Julia process; startup files are disabled to ensure
+  reproducibility. If `newprocess=false`, the MWE runs in the current session. If also `temp=true`,
+  a temporary project is activated for the execution and then restored.
+- `manifest=false`: append the `Manifest.toml` in a collapsible `<details>` block.
+- `advertise=nothing`: append a footer noting the date, this package, and Julia version used.
+  If `nothing` (the default), this is `false` for `:slack` and `true` otherwise.
+- `versioninfo=nothing`: whether to append a collapsible "Environment" block showing the output
+  of `versioninfo()`. If `nothing` (the default), this is `true` for `:gh` and `false` otherwise.
+- `preview=nothing`: which viewer shows the rendered result (see [`preview`](@ref)) —
+  `:editor` (the host editor's viewer panel), `:browser`, or `false` (don't preview). If
+  `nothing` (the default), this is `false` in non-interactive sessions, otherwise `:editor`
+  when an editor viewer panel is available and `:browser` otherwise.
+- `packagespecs=PackageSpec[]`: vector of [`Pkg.PackageSpec`](https://pkgdocs.julialang.org/v1/api/#Pkg.PackageSpec)s for packages that need a specific
+  version, git revision, URL, or local path.
+- `manifest_path=nothing`: path to an existing `Manifest.toml` to use as-is.
+  Mutually exclusive with `packagespecs`.
+- `verbose=false`: if `true`, show Pkg output (downloads, resolver messages) during environment
+  setup.
+- `julia_args=""`: extra command-line flags passed through to the isolated Julia process, e.g.
+  `"-t 4"` or `"--check-bounds=no"`. Only valid when `newprocess=true`.
+- `plot_dir="MWEPlots"`: directory in which plots produced by the code are saved as PNGs.
+  A visible `**Insert plot here: ...**` placeholder marks each plot's position in the Markdown.
+  End a line with `;` to suppress capture for that expression.
 
-Accepts the same keyword arguments (with the same defaults) as [`@mwe`](@ref).
+!!! tip
+    The defaults above (except `packagespecs` and `manifest_path`) can be changed
+    persistently with [`set_defaults!`](@ref).
 
 # Examples
 
@@ -241,6 +244,16 @@ mean([1, 2, 3])
 mwe(\"""
 1+1 # This comment is preserved
 \""")
+```
+
+Pin a package to a specific version:
+
+```julia
+using Pkg
+mwe(\"""
+using Example
+Example.hello("World")
+\"""; packagespecs=[PackageSpec(name="Example", version="0.5.3")])
 ```
 """
 function mwe(
@@ -399,7 +412,7 @@ end
 """
     MWEResult
 
-Wraps the Markdown string produced by `@mwe`. Displays silently in the REPL —
+Wraps the Markdown string produced by `mwe`. Displays silently in the REPL —
 access the Markdown string via `.md`.
 """
 struct MWEResult
