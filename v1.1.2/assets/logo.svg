@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 84 52" role="img" aria-labelledby="mwe-logo-title">
+  <title id="mwe-logo-title">MinimalWorkingExamples.jl logo</title>
+  <text x="42" y="40" text-anchor="middle"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
+        font-weight="700" font-size="44" letter-spacing="-2">
+    <tspan fill="#cb3c33">M</tspan><tspan fill="#389826">W</tspan><tspan fill="#9558b2">E</tspan>
+  </text>
+</svg>
