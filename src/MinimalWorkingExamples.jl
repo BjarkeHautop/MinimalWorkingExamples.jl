@@ -677,7 +677,7 @@ function _build_driver_script(
     plot_capture = isnothing(plot_dir) ? "" : """
             if _mwe_err === nothing && _mwe_val !== nothing &&
                Base.invokelatest(showable, MIME("image/png"), _mwe_val) &&
-               !endswith(_mwe_chunk, ';')
+               !_mwe_ends_with_semicolon(_mwe_chunk)
                 try
                     _mwe_save_plot(_mwe_val)
                     _mwe_val = nothing
@@ -727,10 +727,17 @@ function _build_driver_script(
     const _MWE_SUPPRESSED_HEADS =
         (:(=), :function, :struct, :abstract, :primitive, :module, :macro)
     function _mwe_suppresses_display(ex)
-        while ex isa Expr && ex.head in (:local, :global, :const)
-            ex = ex.args[1]
+        while ex isa Expr && ex.head in (:local, :global, :const, :toplevel) && !isempty(ex.args)
+            ex = ex.args[end]
         end
         return ex isa Expr && ex.head in _MWE_SUPPRESSED_HEADS
+    end
+    function _mwe_ends_with_semicolon(str)
+        for line in Iterators.reverse(split(str, '\\n'))
+            _mwe_is_comment_or_blank(line) && continue
+            return endswith(rstrip(replace(line, r"\\s#[^\\"]*\$" => "")), ';')
+        end
+        return false
     end
     $plot_setup
     const _mwe_code = $(repr(code_str))
@@ -825,6 +832,7 @@ function _build_driver_script(
             break
         end
         if !_mwe_suppresses_display(_mwe_node) &&
+           !_mwe_ends_with_semicolon(_mwe_chunk) &&
            _mwe_val !== nothing &&
            isempty(_mwe_captured_out)
             _mwe_buf = IOBuffer()
@@ -1058,10 +1066,23 @@ const _MWE_SUPPRESSED_HEADS =
     (:(=), :function, :struct, :abstract, :primitive, :module, :macro)
 
 function _suppresses_display(ex)
-    while ex isa Expr && ex.head in (:local, :global, :const)
-        ex = ex.args[1]
+    # `a; b` (and `a;`) parse as `Expr(:toplevel, ...)`; judge by the last statement.
+    while ex isa Expr &&
+          ex.head in (:local, :global, :const, :toplevel) &&
+          !isempty(ex.args)
+        ex = ex.args[end]
     end
     return ex isa Expr && ex.head in _MWE_SUPPRESSED_HEADS
+end
+
+# Whether the last line of code in `str` ends with `;` (ignoring blank lines and
+# trailing comments), which suppresses the value like in the REPL.
+function _ends_with_semicolon(str::AbstractString)
+    for line in Iterators.reverse(split(str, '\n'))
+        _is_comment_or_blank(line) && continue
+        return endswith(rstrip(replace(line, r"\s#[^\"]*$" => "")), ';')
+    end
+    return false
 end
 
 function _execute_code_in_current_process(
@@ -1126,7 +1147,7 @@ function _execute_code_in_current_process(
                 if isnothing(result.error) &&
                    value_to_show !== nothing &&
                    Base.invokelatest(showable, MIME("image/png"), value_to_show) &&
-                   !endswith(ex_str, ';')
+                   !_ends_with_semicolon(ex_str)
                     try
                         save_plot(value_to_show)
                         value_to_show = nothing
@@ -1153,6 +1174,7 @@ function _execute_code_in_current_process(
                 break
             end
             if !_suppresses_display(node) &&
+               !_ends_with_semicolon(ex_str) &&
                value_to_show !== nothing &&
                isempty(result.stdout)
                 val_buf = IOBuffer()

@@ -824,6 +824,44 @@ end
     @test _suppresses_display(nested)
 end
 
+@testitem "_suppresses_display: unwraps semicolon-separated toplevel" tags=[:unit, :fast] begin
+    using MinimalWorkingExamples: _suppresses_display
+
+    @test _suppresses_display(Expr(:toplevel, :(x = 1)))
+    @test _suppresses_display(Expr(:toplevel, :(x + 1), :(y = 2)))
+    @test !_suppresses_display(Expr(:toplevel, :(x = 1), :(y + 2)))
+end
+
+@testitem "_ends_with_semicolon" tags=[:unit, :fast] begin
+    using MinimalWorkingExamples: _ends_with_semicolon
+
+    @test _ends_with_semicolon("x = [\n  1 2;\n  3 4\n];")
+    @test _ends_with_semicolon("1 + 1;  ")
+    @test _ends_with_semicolon("1 + 1; # comment")
+    @test _ends_with_semicolon("1 + 1;\n# trailing comment\n")
+    @test !_ends_with_semicolon("1 + 1")
+    @test !_ends_with_semicolon("a; b")
+    @test !_ends_with_semicolon("x = \"a;\" # comment")
+end
+
+@testitem "trailing semicolon suppresses value in both backends" tags=[:integration, :slow] begin
+    for newprocess in (false, true)
+        result = MinimalWorkingExamples._run_mwe(
+            "data = [\n    946 2;\n    1740 4\n];\n1 + 1;\ny = 2; 3 + 4\nz = 5; w = 6";
+            temp = false,
+            newprocess,
+            manifest = false,
+            advertise = false,
+            versioninfo = false,
+            packagespecs = [],
+        )
+        @test !contains(result.md, "Matrix")
+        @test !contains(result.md, "#> 2")
+        @test contains(result.md, "#> 7")
+        @test !contains(result.md, "#> 6")
+    end
+end
+
 # ── sandbox isolation ─────────────────────────────────────────────────────────
 
 @testitem "sandbox: subprocess LOAD_PATH excludes global environment" tags=[
