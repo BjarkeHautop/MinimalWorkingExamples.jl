@@ -743,17 +743,39 @@ function _build_driver_script(
     const _mwe_code = $(repr(code_str))
     const _mwe_src_lines = split(_mwe_code, '\\n')
 
-    # Pair each expression with its start line from LineNumberNodes. The first
-    # item always starts at line 1 so that comments preceding the first
-    # expression (which precede any LineNumberNode) are not dropped.
-    _mwe_items = Tuple{Int,Any}[]
-    let _cur_line = 1
-        for _n in Meta.parseall(_mwe_code).args
-            if _n isa LineNumberNode
-                _cur_line = _n.line
+    # Pair each expression with the line its code starts on. The first item
+    # always starts at line 1 so that comments preceding it are not dropped.
+    # Start lines come from parsing one statement at a time, since
+    # `Meta.parseall`'s LineNumberNodes are wrong on Julia 1.10 after
+    # `;`-terminated statements.
+    function _mwe_skip_trivia(code, pos)
+        while pos <= ncodeunits(code)
+            if isspace(code[pos])
+                pos = nextind(code, pos)
+            elseif startswith(SubString(code, pos), "#=")
+                block_end = findnext("=#", code, pos + 2)
+                pos = isnothing(block_end) ? ncodeunits(code) + 1 : last(block_end) + 1
+            elseif code[pos] == '#'
+                newline = findnext('\\n', code, pos)
+                pos = isnothing(newline) ? ncodeunits(code) + 1 : newline
             else
-                push!(_mwe_items, (isempty(_mwe_items) ? 1 : _cur_line, _n))
+                break
             end
+        end
+        return pos
+    end
+    _mwe_items = Tuple{Int,Any}[]
+    let _pos = 1
+        for _n in Meta.parseall(_mwe_code).args
+            _n isa LineNumberNode && continue
+            _line = if isempty(_mwe_items)
+                1
+            else
+                _start = _mwe_skip_trivia(_mwe_code, _pos)
+                count(==('\\n'), SubString(_mwe_code, 1, prevind(_mwe_code, _start))) + 1
+            end
+            push!(_mwe_items, (_line, _n))
+            _pos = Meta.parse(_mwe_code, _pos; raise = false)[2]
         end
     end
 
@@ -1052,6 +1074,45 @@ function _find_final_end_line(
     return max(end_line, start_line)
 end
 
+# Index of the first character at or after `pos` that is not whitespace or a comment.
+function _skip_trivia(code::AbstractString, pos::Int)
+    while pos <= ncodeunits(code)
+        if isspace(code[pos])
+            pos = nextind(code, pos)
+        elseif startswith(SubString(code, pos), "#=")
+            block_end = findnext("=#", code, pos + 2)
+            pos = isnothing(block_end) ? ncodeunits(code) + 1 : last(block_end) + 1
+        elseif code[pos] == '#'
+            newline = findnext('\n', code, pos)
+            pos = isnothing(newline) ? ncodeunits(code) + 1 : newline
+        else
+            break
+        end
+    end
+    return pos
+end
+
+# Pair each top-level expression with the line its code starts on. The first item
+# always starts at line 1 so that comments preceding it are not dropped. Start lines
+# come from parsing one statement at a time, since `Meta.parseall`'s LineNumberNodes
+# are wrong on Julia 1.10 after `;`-terminated statements.
+function _parse_items(code::AbstractString)
+    items = Tuple{Int,Any}[]
+    pos = 1
+    for node in Meta.parseall(code).args
+        node isa LineNumberNode && continue
+        line = if isempty(items)
+            1
+        else
+            start = _skip_trivia(code, pos)
+            count(==('\n'), SubString(code, 1, prevind(code, start))) + 1
+        end
+        push!(items, (line, node))
+        pos = Meta.parse(code, pos; raise = false)[2]
+    end
+    return items
+end
+
 function _format_error(ce::CapturedError; stacktrace::Bool = false)
     stacktrace || return sprint(showerror, ce.exception)
     frames = _user_frames(ce.backtrace)
@@ -1092,16 +1153,7 @@ function _execute_code_in_current_process(
     buf = IOBuffer()
     stacktrace_str = ""
     src_lines = split(String(code_str)::String, '\n')
-    items = Tuple{Int,Any}[]
-    let cur_line = 1
-        for n in Meta.parseall(code_str).args
-            if n isa LineNumberNode
-                cur_line = n.line
-            else
-                push!(items, (isempty(items) ? 1 : cur_line, n))
-            end
-        end
-    end
+    items = _parse_items(code_str)
     # Precompute each expression's trimmed end line (independent of evaluation),
     # then derive its *display* start: the first item keeps the whole leading
     # region (so comments before it are preserved, as before); later items start

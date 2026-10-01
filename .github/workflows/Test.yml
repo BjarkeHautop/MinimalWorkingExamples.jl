@@ -23,6 +23,8 @@ jobs:
       matrix:
         version:
           - "lts"
+          - "1.11"
+          - "1.12"
           - "1"
         os:
           - ubuntu-latest
@@ -31,3 +33,8 @@ jobs:
         arch:
           - x64
         allow_failure: [false]
+        include:
+          - version: "pre"
+            os: ubuntu-latest
+            arch: x64
+            allow_failure: true

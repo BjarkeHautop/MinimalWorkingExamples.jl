@@ -832,6 +832,13 @@ end
     @test !_suppresses_display(Expr(:toplevel, :(x = 1), :(y + 2)))
 end
 
+@testitem "_parse_items: start lines after `;`-terminated statements" tags=[:unit, :fast] begin
+    using MinimalWorkingExamples: _parse_items
+
+    code = "# lead\n1 + 1;\ny = 2; 3 + 4\n\n# c\n#= block\n=# z = 5;\nw"
+    @test first.(_parse_items(code)) == [1, 3, 7, 8]
+end
+
 @testitem "_ends_with_semicolon" tags=[:unit, :fast] begin
     using MinimalWorkingExamples: _ends_with_semicolon
 
